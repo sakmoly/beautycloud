@@ -27,6 +27,11 @@ ACTIVE_CALENDAR_STATUSES = (
 	"Completed",
 )
 
+CALENDAR_DISPLAY_STATUSES = ACTIVE_CALENDAR_STATUSES + (
+	"Cancelled",
+	"No Show",
+)
+
 ALLOWED_TRANSITIONS = {
 	"Draft": {"Booked", "Confirmed", "Cancelled"},
 	"Booked": {"Confirmed", "Checked In", "Waiting", "Cancelled", "No Show", "Rescheduled"},
@@ -138,7 +143,7 @@ def get_reception_calendar(
 		filters={
 			"beauty_branch": beauty_branch,
 			"appointment_date": ("between", [start_date, end_date]),
-			"status": ("in", list(ACTIVE_CALENDAR_STATUSES)),
+			"status": ("in", list(CALENDAR_DISPLAY_STATUSES)),
 		},
 		fields=[
 			"name",
@@ -215,6 +220,7 @@ def get_waiting_queue(beauty_branch: str, appointment_date=None) -> list[dict]:
 			"name",
 			"customer",
 			"customer_name",
+			"beauty_branch",
 			"appointment_date",
 			"scheduled_start",
 			"scheduled_end",
@@ -326,6 +332,87 @@ def mark_no_show(name: str) -> dict:
 		if row.status not in ("Completed", "Cancelled"):
 			row.status = "Cancelled"
 	doc.save()
+	return doc.as_dict()
+
+
+RESTORABLE_STATUSES = ("No Show", "Cancelled")
+
+
+def restore_appointment(name: str) -> dict:
+	"""Restore a cancelled or no-show appointment back to the active schedule."""
+	from beauty_cloud.services.payment_gate import is_appointment_paid
+
+	doc = frappe.get_doc("Beauty Appointment", name)
+	doc.check_permission("write")
+	if doc.status not in RESTORABLE_STATUSES:
+		frappe.throw(
+			_("Only cancelled or no-show appointments can be restored"),
+			title=_("Cannot Restore"),
+		)
+
+	doc.status = "Checked In" if is_appointment_paid(doc.payment_status) else "Confirmed"
+	for row in doc.services:
+		if row.status == "Cancelled":
+			row.status = "Pending"
+	doc.save()
+	return doc.as_dict()
+
+
+def maybe_restore_appointment_after_payment(name: str, payment_status: str | None) -> None:
+	"""When POS payment completes, reactivate appointments marked no-show or cancelled."""
+	from beauty_cloud.services.payment_gate import is_appointment_paid
+
+	if not name or not is_appointment_paid(payment_status):
+		return
+	status = frappe.db.get_value("Beauty Appointment", name, "status")
+	if status in RESTORABLE_STATUSES:
+		restore_appointment(name)
+
+
+def reschedule_appointment(name: str, start_time: str, employee: str | None = None) -> dict:
+	"""Move an appointment to a new date/time (and optionally another beautician)."""
+	from beauty_cloud.services.availability import validate_slot
+	from beauty_cloud.services.booking import _apply_slot_to_appointment, _validate_no_overlap
+
+	doc = frappe.get_doc("Beauty Appointment", name)
+	doc.check_permission("write")
+
+	if doc.status in ("Completed", "Cancelled", "No Show"):
+		frappe.throw(_("Cannot reschedule appointment in status {0}").format(doc.status))
+
+	prior_status = doc.status if doc.status not in ("Rescheduled", "Draft") else "Confirmed"
+	service_codes = [row.beauty_service for row in doc.services]
+	employee = employee or (doc.services[0].employee if doc.services else None)
+	if not employee:
+		frappe.throw(_("Select a beautician"))
+
+	new_date = getdate(start_time)
+	slot = validate_slot(
+		doc.beauty_branch,
+		str(new_date),
+		service_codes,
+		start_time,
+		employee,
+		doc.service_location,
+	)
+
+	frappe.db.begin()
+	try:
+		_validate_no_overlap(
+			doc.beauty_branch,
+			employee,
+			slot["start_time"],
+			slot["end_time"],
+			exclude=name,
+		)
+		_apply_slot_to_appointment(doc, slot, employee)
+		doc.status = prior_status
+		doc.save()
+		frappe.db.commit()
+	except Exception:
+		frappe.db.rollback()
+		raise
+
 	return doc.as_dict()
 
 
@@ -532,6 +619,7 @@ def _normalize_calendar_event(appt, line, customer_contact: dict | None = None) 
 		"payment_status": appt.payment_status,
 		"source": appt.source,
 		"appointment_date": str(appt.appointment_date),
+		"beauty_branch": appt.beauty_branch,
 		"service_row": line.idx,
 		"beauty_service": line.beauty_service,
 		"service_name": service_name,

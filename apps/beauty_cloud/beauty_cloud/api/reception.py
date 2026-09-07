@@ -15,6 +15,8 @@ from beauty_cloud.services.reception import (
 	get_waiting_queue,
 	mark_no_show,
 	reassign_beautician,
+	reschedule_appointment,
+	restore_appointment,
 	start_appointment,
 	transition_appointment_status,
 )
@@ -84,6 +86,16 @@ def complete(name: str, service_row: int | None = None):
 @frappe.whitelist()
 def no_show(name: str):
 	return mark_no_show(name)
+
+
+@frappe.whitelist()
+def restore(name: str):
+	return restore_appointment(name)
+
+
+@frappe.whitelist()
+def reschedule(name: str, start_time: str, employee: str | None = None):
+	return reschedule_appointment(name, start_time, employee)
 
 
 @frappe.whitelist()

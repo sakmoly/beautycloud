@@ -13,7 +13,6 @@ export default async function ReceptionCalendarPage() {
 
   return (
     <StaffShell bootstrap={bootstrap} session={session}>
-      <h2 className="mb-6 text-2xl font-semibold">Calendar</h2>
       <ReceptionCalendarView />
     </StaffShell>
   );

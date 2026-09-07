@@ -116,3 +116,74 @@ export function monthGridDays(anchor: string): Date[] {
 }
 
 export const DAY_HOURS = Array.from({ length: 13 }, (_, i) => i + 8);
+
+export const TIMELINE_START_HOUR = 8;
+export const TIMELINE_END_HOUR = 20;
+export const TIMELINE_HOUR_HEIGHT = 72;
+
+export function parseEventMinutes(iso?: string): number | null {
+  if (!iso || iso.length < 16) return null;
+  const hour = Number(iso.slice(11, 13));
+  const minute = Number(iso.slice(14, 16));
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return hour * 60 + minute;
+}
+
+export function formatHourLabel(hour: number): string {
+  if (hour === 0 || hour === 24) return "12 am";
+  if (hour === 12) return "12 pm";
+  if (hour < 12) return `${hour} am`;
+  return `${hour - 12} pm`;
+}
+
+export function formatTimelineTime(iso?: string): string {
+  const minutes = parseEventMinutes(iso);
+  if (minutes === null) return "—";
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour >= 12 ? "pm" : "am";
+  const displayHour = hour % 12 || 12;
+  if (minute === 0) return `${displayHour} ${suffix}`;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+export function eventDurationMinutes(start?: string, end?: string): number {
+  const startMinutes = parseEventMinutes(start);
+  const endMinutes = parseEventMinutes(end);
+  if (startMinutes === null) return 60;
+  if (endMinutes === null || endMinutes <= startMinutes) return 60;
+  return endMinutes - startMinutes;
+}
+
+export function timelinePosition(start?: string, end?: string) {
+  const startMinutes = parseEventMinutes(start);
+  const timelineStart = TIMELINE_START_HOUR * 60;
+  const timelineEnd = TIMELINE_END_HOUR * 60;
+
+  if (startMinutes === null) {
+    return { top: 0, height: TIMELINE_HOUR_HEIGHT, visible: false };
+  }
+
+  const clampedStart = Math.max(startMinutes, timelineStart);
+  const duration = eventDurationMinutes(start, end);
+  const endMinutes = Math.min(startMinutes + duration, timelineEnd);
+  const visibleMinutes = Math.max(endMinutes - clampedStart, 20);
+
+  return {
+    top: ((clampedStart - timelineStart) / 60) * TIMELINE_HOUR_HEIGHT,
+    height: Math.max((visibleMinutes / 60) * TIMELINE_HOUR_HEIGHT, 44),
+    visible: startMinutes < timelineEnd && endMinutes > timelineStart,
+  };
+}
+
+export function timelineNowOffset(now = new Date()): number | null {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const timelineStart = TIMELINE_START_HOUR * 60;
+  const timelineEnd = TIMELINE_END_HOUR * 60;
+  if (minutes < timelineStart || minutes > timelineEnd) return null;
+  return ((minutes - timelineStart) / 60) * TIMELINE_HOUR_HEIGHT;
+}
+
+export function isTodayIso(iso: string): boolean {
+  return iso === formatIsoDate(new Date());
+}

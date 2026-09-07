@@ -119,6 +119,8 @@ export function ReceptionQueueView() {
                     customer_mobile={a.customer_mobile ?? a.mobile}
                     customer_email={a.customer_email}
                     payment_status={a.payment_status}
+                    beauty_branch={a.beauty_branch ?? branch}
+                    appointment_date={a.appointment_date ?? date}
                     services={a.services}
                     onUpdated={load}
                   />

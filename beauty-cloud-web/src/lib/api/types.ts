@@ -119,6 +119,8 @@ export interface CalendarEvent {
   customer_email?: string;
   service_name?: string;
   appointment_date?: string;
+  beauty_branch?: string;
+  beauty_service?: string;
   payment_status?: string;
   service_row?: number;
 }

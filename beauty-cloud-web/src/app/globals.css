@@ -352,3 +352,145 @@ code {
   font-weight: 700;
   color: var(--bc-secondary);
 }
+
+/* Reception calendar timeline */
+.bc-cal-shell {
+  border-radius: var(--bc-radius-lg);
+  border: 1px solid var(--bc-border);
+  background: var(--bc-surface);
+  box-shadow: var(--bc-shadow-lg);
+  overflow: hidden;
+}
+
+.bc-cal-toolbar {
+  border-bottom: 1px solid var(--bc-border);
+  background: linear-gradient(180deg, #fff7f9 0%, #ffffff 100%);
+}
+
+.bc-cal-timeline {
+  position: relative;
+  min-height: calc(var(--bc-timeline-hours) * var(--bc-hour-height) * 1px);
+}
+
+.bc-cal-hour-row {
+  position: relative;
+  height: calc(var(--bc-hour-height) * 1px);
+  border-top: 1px solid rgb(240 224 229 / 0.9);
+}
+
+.bc-cal-hour-row:first-child {
+  border-top: none;
+}
+
+.bc-cal-hour-label {
+  position: absolute;
+  left: 0;
+  top: -0.55rem;
+  width: 3.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--bc-muted);
+  text-align: right;
+  padding-right: 0.75rem;
+}
+
+.bc-cal-events-layer {
+  position: absolute;
+  inset: 0 0 0 3.75rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+.bc-cal-event-block {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  background: linear-gradient(145deg, #f8cdb8 0%, #efb89f 55%, #e8a88e 100%);
+  box-shadow: 0 6px 18px rgb(194 24 91 / 0.12);
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bc-cal-event-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgb(194 24 91 / 0.16);
+}
+
+.bc-cal-event-block.is-selected {
+  outline: 2px solid var(--bc-secondary);
+  outline-offset: 2px;
+}
+
+.bc-cal-event-block.is-inactive {
+  background: linear-gradient(145deg, #f3ece8 0%, #e8e0dc 100%);
+  box-shadow: none;
+  opacity: 0.85;
+}
+
+.bc-cal-event-block.is-active-service {
+  background: linear-gradient(145deg, #ffd6e0 0%, #f4a4b5 100%);
+}
+
+.bc-cal-event-block.is-completed {
+  background: linear-gradient(145deg, #e8f5ec 0%, #d4eadc 100%);
+}
+
+.bc-cal-now-line {
+  position: absolute;
+  left: 3.25rem;
+  right: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.bc-cal-now-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--bc-danger);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.8);
+}
+
+.bc-cal-now-dot {
+  position: absolute;
+  left: -0.35rem;
+  top: -0.35rem;
+  height: 0.65rem;
+  width: 0.65rem;
+  border-radius: 50%;
+  background: var(--bc-danger);
+  box-shadow: 0 0 0 3px rgb(198 40 40 / 0.15);
+}
+
+.bc-cal-mini-day {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bc-cal-mini-day.is-selected {
+  background: var(--bc-secondary);
+  color: #fff;
+}
+
+.bc-cal-mini-day.is-today:not(.is-selected) {
+  background: var(--bc-accent-light);
+  color: var(--bc-secondary);
+}
+
+.bc-cal-mini-day.has-events:not(.is-selected) {
+  box-shadow: inset 0 -3px 0 var(--bc-accent);
+}

@@ -7,10 +7,13 @@ import { fetchBootstrap, receptionAction } from "@/lib/api/browser-client";
 import type { CalendarEvent } from "@/lib/api/types";
 import { withBasePath } from "@/lib/base-path";
 import { eventTimeLabel } from "@/lib/calendar-utils";
+import { isInactiveAppointmentStatus } from "@/lib/appointment-status";
 import { customerInitials } from "@/components/pos/pos-utils";
 import { CheckInQrScanner } from "@/components/reception/check-in-qr-scanner";
+import { AppointmentRescheduleSection } from "@/components/reception/appointment-reschedule";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function statusTone(status?: string): "default" | "success" | "warning" | "danger" | "muted" | "accent" {
   const s = (status ?? "").toLowerCase();
@@ -96,14 +99,19 @@ export function AppointmentActionPanel({
   onUpdated,
   onClose,
   variant = "default",
+  beautyBranch,
+  employees = [],
 }: {
   event: CalendarEvent;
   onUpdated?: () => void;
   onClose?: () => void;
   variant?: "default" | "modal";
+  beautyBranch?: string;
+  employees?: Array<{ name: string; employee_name: string }>;
 }) {
   const appointment = event.appointment ?? event.name;
-  const status = event.appointment_status ?? event.status ?? "Booked";
+  const appointmentStatus = event.appointment_status ?? "Booked";
+  const status = appointmentStatus;
   const serviceRow = event.service_row;
   const paid = isPaid(event.payment_status);
   const isModal = variant === "modal";
@@ -112,6 +120,7 @@ export function AppointmentActionPanel({
   const [requireQrForCheckIn, setRequireQrForCheckIn] = useState(true);
   const [checkInToken, setCheckInToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmNoShow, setConfirmNoShow] = useState(false);
 
   useEffect(() => {
     fetchBootstrap()
@@ -137,6 +146,15 @@ export function AppointmentActionPanel({
     }
   }
 
+  async function markNoShow() {
+    setConfirmNoShow(false);
+    await act("beauty_cloud.api.reception.no_show");
+  }
+
+  async function restoreAppointment() {
+    await act("beauty_cloud.api.reception.restore");
+  }
+
   const posHref = withBasePath(`/staff/pos?appointment=${encodeURIComponent(appointment ?? "")}`);
   const timeLabel = eventTimeLabel(event.start ?? event.start_time, event.end ?? event.end_time);
 
@@ -148,6 +166,9 @@ export function AppointmentActionPanel({
     !paymentBlocksService && ["Draft", "Booked", "Confirmed", "Checked In", "Waiting"].includes(status);
   const canComplete = !paymentBlocksService && ["In Service", "Partially Completed"].includes(status);
   const canNoShow = ["Booked", "Confirmed", "Checked In", "Waiting"].includes(status);
+  const isInactive = isInactiveAppointmentStatus(status);
+  const canReschedule = !isInactive && !["Completed", "In Service", "Partially Completed"].includes(status);
+  const branch = beautyBranch ?? event.beauty_branch;
 
   if (isModal) {
     return (
@@ -209,6 +230,19 @@ export function AppointmentActionPanel({
             </div>
           </dl>
 
+          {canReschedule ? (
+            <AppointmentRescheduleSection
+              appointment={appointment}
+              beautyBranch={branch}
+              beautyService={event.beauty_service}
+              appointmentDate={event.appointment_date ?? event.start?.slice(0, 10)}
+              employee={event.employee}
+              employees={employees}
+              disabled={busy}
+              onUpdated={onUpdated}
+            />
+          ) : null}
+
           <CustomerContactSection
             mobile={event.customer_mobile}
             email={event.customer_email}
@@ -218,6 +252,22 @@ export function AppointmentActionPanel({
             <p className="rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bc-secondary)]">
               Payment is required before the service can start. Check the guest in, then take payment at
               POS to print a receipt.
+            </p>
+          ) : null}
+
+          {isInactive ? (
+            <p className="rounded-2xl border border-[color:var(--bc-border)] bg-[color:var(--bc-surface)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bc-muted)]">
+              This appointment is marked as <strong>{status}</strong>, which is why it shows crossed out on
+              the calendar.
+              {paid ? (
+                <>
+                  {" "}
+                  Payment is complete — tap <strong>Restore appointment</strong> below to remove the cross
+                  and continue the service.
+                </>
+              ) : (
+                <> Tap Restore appointment below if this was a mistake.</>
+              )}
             </p>
           ) : null}
 
@@ -281,12 +331,36 @@ export function AppointmentActionPanel({
               </Button>
             ) : null}
             {canNoShow ? (
-              <Button variant="ghost" disabled={busy} onClick={() => act("beauty_cloud.api.reception.no_show")}>
+              <Button variant="ghost" disabled={busy} onClick={() => setConfirmNoShow(true)}>
                 Mark no show
+              </Button>
+            ) : null}
+            {isInactive ? (
+              <Button disabled={busy} onClick={restoreAppointment}>
+                Restore appointment
               </Button>
             ) : null}
           </div>
         </div>
+
+        <ConfirmDialog
+          open={confirmNoShow}
+          onClose={() => setConfirmNoShow(false)}
+          onConfirm={markNoShow}
+          title="Mark as no show?"
+          confirmLabel="Mark no show"
+          cancelLabel="Keep appointment"
+          busy={busy}
+        >
+          <p>
+            This will mark <strong>{event.customer_name ?? "this guest"}</strong> (
+            <strong>{appointment}</strong>) as a no-show and cancel their pending services.
+          </p>
+          <p className="mt-2">
+            The appointment will stay on the calendar with a crossed-out marker so staff can see what
+            happened.
+          </p>
+        </ConfirmDialog>
       </div>
     );
   }
@@ -323,6 +397,28 @@ export function AppointmentActionPanel({
           Payment required before service can start. Check the customer in, then complete payment at POS
           to print a receipt.
         </p>
+      ) : null}
+
+      {isInactive ? (
+        <p className="mt-3 rounded-2xl border border-[color:var(--bc-border)] bg-[color:var(--bc-surface)] px-4 py-3 text-sm text-[color:var(--bc-muted)]">
+          Marked as <strong>{status}</strong> — crossed out on the calendar.
+          {paid ? " Payment is complete. Restore to continue the service." : " Restore if this was a mistake."}
+        </p>
+      ) : null}
+
+      {canReschedule ? (
+        <div className="mt-3">
+          <AppointmentRescheduleSection
+            appointment={appointment}
+            beautyBranch={branch}
+            beautyService={event.beauty_service}
+            appointmentDate={event.appointment_date ?? event.start?.slice(0, 10)}
+            employee={event.employee}
+            employees={employees}
+            disabled={busy}
+            onUpdated={onUpdated}
+          />
+        </div>
       ) : null}
 
       <CustomerContactSection mobile={event.customer_mobile} email={event.customer_email} />
@@ -385,11 +481,35 @@ export function AppointmentActionPanel({
           </Button>
         ) : null}
         {canNoShow ? (
-          <Button variant="ghost" disabled={busy} onClick={() => act("beauty_cloud.api.reception.no_show")}>
+          <Button variant="ghost" disabled={busy} onClick={() => setConfirmNoShow(true)}>
             No show
           </Button>
         ) : null}
+        {isInactive ? (
+          <Button disabled={busy} onClick={restoreAppointment}>
+            Restore
+          </Button>
+        ) : null}
       </div>
+
+      <ConfirmDialog
+        open={confirmNoShow}
+        onClose={() => setConfirmNoShow(false)}
+        onConfirm={markNoShow}
+        title="Mark as no show?"
+        confirmLabel="Mark no show"
+        cancelLabel="Keep appointment"
+        busy={busy}
+      >
+        <p>
+          This will mark <strong>{event.customer_name ?? "this guest"}</strong> (
+          <strong>{appointment}</strong>) as a no-show and cancel their pending services.
+        </p>
+        <p className="mt-2">
+          The appointment will stay on the calendar with a crossed-out marker so staff can see what
+          happened.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -402,15 +522,28 @@ export function QueueAppointmentActions({
   customer_mobile,
   customer_email,
   payment_status,
+  beauty_branch,
+  appointment_date,
+  employees,
   onUpdated,
 }: {
   appointment: string;
   status?: string;
-  services?: Array<{ idx?: number; service_name?: string; employee_name?: string }>;
+  services?: Array<{
+    idx?: number;
+    service_name?: string;
+    employee_name?: string;
+    employee?: string;
+    beauty_service?: string;
+    start_time?: string;
+  }>;
   customer_name?: string;
   customer_mobile?: string;
   customer_email?: string;
   payment_status?: string;
+  beauty_branch?: string;
+  appointment_date?: string;
+  employees?: Array<{ name: string; employee_name: string }>;
   onUpdated?: () => void;
 }) {
   const firstService = services?.[0];
@@ -421,13 +554,21 @@ export function QueueAppointmentActions({
         appointment_status: status,
         service_row: firstService?.idx,
         service_name: firstService?.service_name,
+        employee: firstService?.employee,
         employee_name: firstService?.employee_name,
         customer_name,
         customer_mobile,
         customer_email,
         payment_status,
         status,
+        beauty_branch,
+        beauty_service: firstService?.beauty_service,
+        appointment_date,
+        start: firstService?.start_time,
+        start_time: firstService?.start_time,
       }}
+      beautyBranch={beauty_branch}
+      employees={employees}
       onUpdated={onUpdated}
     />
   );

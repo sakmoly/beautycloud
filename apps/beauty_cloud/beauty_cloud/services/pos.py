@@ -97,14 +97,18 @@ def checkout(cart: dict) -> dict:
 	_create_payment_entries(tx, invoice, validated.get("payments") or [])
 
 	if tx.beauty_appointment:
+		appt_payment_status = _appointment_payment_status(validated)
 		frappe.db.set_value(
 			"Beauty Appointment",
 			tx.beauty_appointment,
 			{
 				"beauty_pos_transaction": tx.name,
-				"payment_status": _appointment_payment_status(validated),
+				"payment_status": appt_payment_status,
 			},
 		)
+		from beauty_cloud.services.reception import maybe_restore_appointment_after_payment
+
+		maybe_restore_appointment_after_payment(tx.beauty_appointment, appt_payment_status)
 
 	return tx.as_dict()
 
