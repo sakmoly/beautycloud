@@ -1,0 +1,183 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-07 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "company",
+  "beauty_appointment",
+  "customer",
+  "column_break_1",
+  "status",
+  "payment_type",
+  "gateway",
+  "section_break_amounts",
+  "amount",
+  "currency",
+  "appointment_total",
+  "column_break_2",
+  "paid_at",
+  "section_break_gateway",
+  "cart_id",
+  "telr_order_ref",
+  "telr_status_code",
+  "demo_token",
+  "gateway_response"
+ ],
+ "fields": [
+  {
+   "default": "BBPAY-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "BBPAY-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "beauty_appointment",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Beauty Appointment",
+   "options": "Beauty Appointment",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nPaid\nFailed\nCancelled\nExpired",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_type",
+   "fieldtype": "Select",
+   "label": "Payment Type",
+   "options": "Full Amount\nDeposit Only"
+  },
+  {
+   "default": "Telr",
+   "fieldname": "gateway",
+   "fieldtype": "Select",
+   "label": "Gateway",
+   "options": "Telr\nDemo"
+  },
+  {
+   "fieldname": "section_break_amounts",
+   "fieldtype": "Section Break",
+   "label": "Amounts"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount Due",
+   "options": "currency",
+   "reqd": 1
+  },
+  {
+   "default": "SAR",
+   "fieldname": "currency",
+   "fieldtype": "Data",
+   "label": "Currency"
+  },
+  {
+   "fieldname": "appointment_total",
+   "fieldtype": "Currency",
+   "label": "Appointment Total",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "paid_at",
+   "fieldtype": "Datetime",
+   "label": "Paid At"
+  },
+  {
+   "fieldname": "section_break_gateway",
+   "fieldtype": "Section Break",
+   "label": "Gateway Details"
+  },
+  {
+   "fieldname": "cart_id",
+   "fieldtype": "Data",
+   "label": "Cart ID",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "telr_order_ref",
+   "fieldtype": "Data",
+   "label": "Telr Order Ref"
+  },
+  {
+   "fieldname": "telr_status_code",
+   "fieldtype": "Data",
+   "label": "Telr Status Code"
+  },
+  {
+   "fieldname": "demo_token",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Demo Token",
+   "read_only": 1
+  },
+  {
+   "fieldname": "gateway_response",
+   "fieldtype": "Code",
+   "label": "Gateway Response",
+   "options": "JSON"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Booking Payment",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

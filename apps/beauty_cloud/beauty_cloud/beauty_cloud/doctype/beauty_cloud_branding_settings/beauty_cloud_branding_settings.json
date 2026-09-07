@@ -1,0 +1,225 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:BCB-{company}-{#####}",
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "enabled",
+  "column_break_1",
+  "application_title",
+  "company_display_name",
+  "section_break_logos",
+  "logo_light",
+  "logo_dark",
+  "favicon",
+  "booking_header_image",
+  "section_break_theme",
+  "theme_mode",
+  "primary_color",
+  "secondary_color",
+  "accent_color",
+  "background_color",
+  "surface_color",
+  "text_color",
+  "muted_text_color",
+  "success_color",
+  "warning_color",
+  "danger_color",
+  "border_radius_style",
+  "section_break_support",
+  "support_email",
+  "support_phone",
+  "custom_footer_text"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "description": "Leave blank for company-wide branding.",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Beauty Branch"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Beauty Cloud",
+   "fieldname": "application_title",
+   "fieldtype": "Data",
+   "label": "Application Title"
+  },
+  {
+   "fieldname": "company_display_name",
+   "fieldtype": "Data",
+   "label": "Company Display Name"
+  },
+  {
+   "fieldname": "section_break_logos",
+   "fieldtype": "Section Break",
+   "label": "Logos"
+  },
+  {
+   "fieldname": "logo_light",
+   "fieldtype": "Attach Image",
+   "label": "Logo (Light)"
+  },
+  {
+   "fieldname": "logo_dark",
+   "fieldtype": "Attach Image",
+   "label": "Logo (Dark)"
+  },
+  {
+   "fieldname": "favicon",
+   "fieldtype": "Attach Image",
+   "label": "Favicon"
+  },
+  {
+   "fieldname": "booking_header_image",
+   "fieldtype": "Attach Image",
+   "label": "Booking Header Image"
+  },
+  {
+   "fieldname": "section_break_theme",
+   "fieldtype": "Section Break",
+   "label": "Theme"
+  },
+  {
+   "default": "Light",
+   "fieldname": "theme_mode",
+   "fieldtype": "Select",
+   "label": "Theme Mode",
+   "options": "Light\nDark\nSystem"
+  },
+  {
+   "default": "#6B4EFF",
+   "fieldname": "primary_color",
+   "fieldtype": "Color",
+   "label": "Primary Color"
+  },
+  {
+   "default": "#1A1A2E",
+   "fieldname": "secondary_color",
+   "fieldtype": "Color",
+   "label": "Secondary Color"
+  },
+  {
+   "default": "#E8B4BC",
+   "fieldname": "accent_color",
+   "fieldtype": "Color",
+   "label": "Accent Color"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "background_color",
+   "fieldtype": "Color",
+   "label": "Background Color"
+  },
+  {
+   "default": "#F8F5FF",
+   "fieldname": "surface_color",
+   "fieldtype": "Color",
+   "label": "Surface Color"
+  },
+  {
+   "default": "#1A1A2E",
+   "fieldname": "text_color",
+   "fieldtype": "Color",
+   "label": "Text Color"
+  },
+  {
+   "default": "#6B7280",
+   "fieldname": "muted_text_color",
+   "fieldtype": "Color",
+   "label": "Muted Text Color"
+  },
+  {
+   "default": "#16A34A",
+   "fieldname": "success_color",
+   "fieldtype": "Color",
+   "label": "Success Color"
+  },
+  {
+   "default": "#D97706",
+   "fieldname": "warning_color",
+   "fieldtype": "Color",
+   "label": "Warning Color"
+  },
+  {
+   "default": "#DC2626",
+   "fieldname": "danger_color",
+   "fieldtype": "Color",
+   "label": "Danger Color"
+  },
+  {
+   "default": "md",
+   "fieldname": "border_radius_style",
+   "fieldtype": "Select",
+   "label": "Border Radius",
+   "options": "sm\nmd\nlg\nfull"
+  },
+  {
+   "fieldname": "section_break_support",
+   "fieldtype": "Section Break",
+   "label": "Support"
+  },
+  {
+   "fieldname": "support_email",
+   "fieldtype": "Data",
+   "label": "Support Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "support_phone",
+   "fieldtype": "Data",
+   "label": "Support Phone"
+  },
+  {
+   "fieldname": "custom_footer_text",
+   "fieldtype": "Small Text",
+   "label": "Custom Footer Text"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Cloud Branding Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

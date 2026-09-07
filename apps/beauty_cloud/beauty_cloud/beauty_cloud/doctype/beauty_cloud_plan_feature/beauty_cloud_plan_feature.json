@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "feature_key",
+  "enabled",
+  "limit_value",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "feature_key",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Feature",
+   "options": "online_booking\nreception\nbeautician_tablet\ninventory_custody\npos\ncommission\nloyalty\nkiosk\nmulti_branch\nmanagement_reports",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "limit_value",
+   "fieldtype": "Int",
+   "label": "Limit Value"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Data",
+   "label": "Notes"
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-09-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Cloud Plan Feature",
+ "permissions": []
+}

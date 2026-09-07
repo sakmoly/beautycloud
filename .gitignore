@@ -1,0 +1,29 @@
+# Beauty Cloud repository — ignore everything except the app and web UI
+/*
+!/.gitignore
+!/README.md
+!/apps/
+!/beauty-cloud-web/
+
+/apps/*
+!/apps/beauty_cloud/
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Node / Next.js
+beauty-cloud-web/node_modules/
+beauty-cloud-web/.next/
+beauty-cloud-web/out/
+beauty-cloud-web/.env*.local
+
+# IDE / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

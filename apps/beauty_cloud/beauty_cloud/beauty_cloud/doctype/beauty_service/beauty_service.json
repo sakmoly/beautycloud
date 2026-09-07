@@ -1,0 +1,178 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:service_code",
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "service_code",
+  "service_name",
+  "service_name_ar",
+  "company",
+  "is_active",
+  "column_break_1",
+  "service_category",
+  "item",
+  "section_break_pricing",
+  "default_duration",
+  "standard_selling_price",
+  "section_break_channels",
+  "online_booking_enabled",
+  "kiosk_enabled",
+  "pos_enabled",
+  "section_break_location",
+  "allow_salon",
+  "allow_home",
+  "allow_hotel",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "service_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Service Code",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "service_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Service Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "service_name_ar",
+   "fieldtype": "Data",
+   "label": "Service Name (Arabic)"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "service_category",
+   "fieldtype": "Link",
+   "label": "Service Category",
+   "options": "Beauty Service Category"
+  },
+  {
+   "description": "Optional ERPNext Item for billing integration.",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "section_break_pricing",
+   "fieldtype": "Section Break",
+   "label": "Pricing & Duration"
+  },
+  {
+   "default": "60",
+   "fieldname": "default_duration",
+   "fieldtype": "Int",
+   "label": "Default Duration (minutes)"
+  },
+  {
+   "fieldname": "standard_selling_price",
+   "fieldtype": "Currency",
+   "label": "Standard Selling Price",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "fieldname": "section_break_channels",
+   "fieldtype": "Section Break",
+   "label": "Channels"
+  },
+  {
+   "default": "1",
+   "fieldname": "online_booking_enabled",
+   "fieldtype": "Check",
+   "label": "Online Booking Enabled"
+  },
+  {
+   "default": "1",
+   "fieldname": "kiosk_enabled",
+   "fieldtype": "Check",
+   "label": "Kiosk Enabled"
+  },
+  {
+   "default": "1",
+   "fieldname": "pos_enabled",
+   "fieldtype": "Check",
+   "label": "POS Enabled"
+  },
+  {
+   "fieldname": "section_break_location",
+   "fieldtype": "Section Break",
+   "label": "Service Locations"
+  },
+  {
+   "default": "1",
+   "fieldname": "allow_salon",
+   "fieldtype": "Check",
+   "label": "Salon"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_home",
+   "fieldtype": "Check",
+   "label": "Home"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_hotel",
+   "fieldtype": "Check",
+   "label": "Hotel"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Service",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "service_name",
+ "track_changes": 1
+}

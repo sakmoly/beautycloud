@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:beauty_branch",
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "beauty_branch",
+  "company",
+  "slot_interval_minutes",
+  "section_break_hours",
+  "hours"
+ ],
+ "fields": [
+  {
+   "fieldname": "beauty_branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Beauty Branch",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fetch_from": "beauty_branch.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "default": "15",
+   "fieldname": "slot_interval_minutes",
+   "fieldtype": "Int",
+   "label": "Slot Interval (minutes)"
+  },
+  {
+   "fieldname": "section_break_hours",
+   "fieldtype": "Section Break",
+   "label": "Opening Hours"
+  },
+  {
+   "fieldname": "hours",
+   "fieldtype": "Table",
+   "label": "Hours",
+   "options": "Beauty Branch Schedule Hour",
+   "reqd": 1
+  }
+ ],
+ "module": "Beauty Cloud",
+ "name": "Beauty Branch Schedule",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Beauty Cloud Branch Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Beauty Cloud Receptionist"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

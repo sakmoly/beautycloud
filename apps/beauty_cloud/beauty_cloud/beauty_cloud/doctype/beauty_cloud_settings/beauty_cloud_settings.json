@@ -1,0 +1,253 @@
+{
+ "actions": [],
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "invoice_posting_type",
+  "column_break_1",
+  "enable_sms",
+  "enable_email_otp",
+  "send_booking_confirmation_email",
+  "booking_from_email",
+  "sms_note",
+  "otp_expiry_minutes",
+  "otp_max_attempts",
+  "section_break_online_booking",
+  "require_payment_at_booking",
+  "booking_payment_type",
+  "booking_deposit_percent",
+  "section_break_salon_payment",
+  "require_payment_before_service",
+  "require_payment_at_kiosk",
+  "require_qr_for_check_in",
+  "section_break_payments",
+  "allowed_payment_methods",
+  "section_break_telr",
+  "enable_telr",
+  "telr_store_id",
+  "telr_auth_key",
+  "telr_demo_mode",
+  "telr_currency",
+  "telr_note",
+  "section_break_zatca",
+  "zatca_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Default Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "Sales Invoice",
+   "description": "Choose whether checkout creates Sales Invoice or POS Invoice. ZATCA/e-invoicing behaviour is configured in ZATCA settings when that app is installed.",
+   "fieldname": "invoice_posting_type",
+   "fieldtype": "Select",
+   "label": "Invoice Posting Type",
+   "options": "Sales Invoice\nPOS Invoice",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "SMS OTP for customer booking is optional. Enable when an SMS provider is configured.",
+   "fieldname": "enable_sms",
+   "fieldtype": "Check",
+   "label": "Enable SMS OTP"
+  },
+  {
+   "default": "1",
+   "description": "Send one-time verification codes by email when the customer provides an email address.",
+   "fieldname": "enable_email_otp",
+   "fieldtype": "Check",
+   "label": "Enable Email OTP"
+  },
+  {
+   "default": "1",
+   "description": "Email customers a booking confirmation with check-in QR code when an appointment is confirmed.",
+   "fieldname": "send_booking_confirmation_email",
+   "fieldtype": "Check",
+   "label": "Send Booking Confirmation Email"
+  },
+  {
+   "description": "Optional sender address for booking emails. Leave blank to use the site default outgoing email.",
+   "fieldname": "booking_from_email",
+   "fieldtype": "Data",
+   "label": "Booking From Email"
+  },
+  {
+   "fieldname": "sms_note",
+   "fieldtype": "Small Text",
+   "label": "SMS Note",
+   "read_only": 1
+  },
+  {
+   "default": "10",
+   "description": "How long the OTP remains valid after it is sent.",
+   "fieldname": "otp_expiry_minutes",
+   "fieldtype": "Int",
+   "label": "OTP Expiry (Minutes)"
+  },
+  {
+   "default": "5",
+   "description": "Maximum verification attempts allowed per OTP request.",
+   "fieldname": "otp_max_attempts",
+   "fieldtype": "Int",
+   "label": "OTP Max Attempts"
+  },
+  {
+   "fieldname": "section_break_online_booking",
+   "fieldtype": "Section Break",
+   "label": "Online Booking Payment"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, customers must pay online before the appointment is confirmed.",
+   "fieldname": "require_payment_at_booking",
+   "fieldtype": "Check",
+   "label": "Require Payment at Booking"
+  },
+  {
+   "default": "Full Amount",
+   "depends_on": "eval:doc.require_payment_at_booking",
+   "fieldname": "booking_payment_type",
+   "fieldtype": "Select",
+   "label": "Booking Payment Type",
+   "options": "Full Amount\nDeposit Only"
+  },
+  {
+   "default": "50",
+   "depends_on": "eval:doc.require_payment_at_booking && doc.booking_payment_type=='Deposit Only'",
+   "fieldname": "booking_deposit_percent",
+   "fieldtype": "Percent",
+   "label": "Deposit Percent"
+  },
+  {
+   "fieldname": "section_break_salon_payment",
+   "fieldtype": "Section Break",
+   "label": "Salon & Kiosk Payment"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, reception/beautician cannot start or complete a service until payment is collected (Cash at reception/kiosk or POS). Check-in only confirms arrival.",
+   "fieldname": "require_payment_before_service",
+   "fieldtype": "Check",
+   "label": "Require Payment Before Service"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the self-service kiosk collects payment (cash/card modes allowed for kiosk) before the booking is confirmed.",
+   "fieldname": "require_payment_at_kiosk",
+   "fieldtype": "Check",
+   "label": "Require Payment at Kiosk"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, reception and beauticians must scan the customer's appointment QR code before check-in. Prevents checking in the wrong guest by mistake.",
+   "fieldname": "require_qr_for_check_in",
+   "fieldtype": "Check",
+   "label": "Require QR Scan for Check-in"
+  },
+  {
+   "fieldname": "section_break_payments",
+   "fieldtype": "Section Break",
+   "label": "Allowed Payment Methods"
+  },
+  {
+   "description": "Only flagged Mode of Payment rows are offered in Beauty Cloud channels. Third-party payment API integration will use these modes later.",
+   "fieldname": "allowed_payment_methods",
+   "fieldtype": "Table",
+   "label": "Allowed Payment Methods",
+   "options": "Beauty Cloud Allowed Payment Method"
+  },
+  {
+   "fieldname": "section_break_telr",
+   "fieldtype": "Section Break",
+   "label": "Telr Payment Gateway"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.require_payment_at_booking",
+   "description": "Enable Telr hosted payment page for online booking checkout.",
+   "fieldname": "enable_telr",
+   "fieldtype": "Check",
+   "label": "Enable Telr Gateway"
+  },
+  {
+   "depends_on": "eval:doc.enable_telr",
+   "description": "Numeric store ID from Telr merchant dashboard.",
+   "fieldname": "telr_store_id",
+   "fieldtype": "Data",
+   "label": "Telr Store ID"
+  },
+  {
+   "depends_on": "eval:doc.enable_telr",
+   "fieldname": "telr_auth_key",
+   "fieldtype": "Password",
+   "label": "Telr Auth Key"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_telr",
+   "description": "When enabled, no live Telr API calls are made. Use demo payment buttons in the booking UI.",
+   "fieldname": "telr_demo_mode",
+   "fieldtype": "Check",
+   "label": "Telr Demo Mode"
+  },
+  {
+   "default": "SAR",
+   "depends_on": "eval:doc.enable_telr",
+   "fieldname": "telr_currency",
+   "fieldtype": "Data",
+   "label": "Telr Currency"
+  },
+  {
+   "depends_on": "eval:doc.enable_telr",
+   "fieldname": "telr_note",
+   "fieldtype": "Small Text",
+   "label": "Telr Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_zatca",
+   "fieldtype": "Section Break",
+   "label": "ZATCA / E-Invoicing"
+  },
+  {
+   "default": "Install and configure zatca_erpgulf on this site for Saudi e-invoicing. Invoice document type above must align with ZATCA settings.",
+   "fieldname": "zatca_note",
+   "fieldtype": "Small Text",
+   "label": "ZATCA Note",
+   "read_only": 1
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Cloud Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

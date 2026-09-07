@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item",
+  "qty",
+  "uom",
+  "is_mandatory",
+  "allow_override",
+  "minimum_qty",
+  "maximum_qty",
+  "wastage_percent",
+  "source_warehouse_policy",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Standard Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_mandatory",
+   "fieldtype": "Check",
+   "label": "Mandatory"
+  },
+  {
+   "default": "1",
+   "fieldname": "allow_override",
+   "fieldtype": "Check",
+   "label": "Allow Actual Qty Override"
+  },
+  {
+   "fieldname": "minimum_qty",
+   "fieldtype": "Float",
+   "label": "Minimum Qty"
+  },
+  {
+   "fieldname": "maximum_qty",
+   "fieldtype": "Float",
+   "label": "Maximum Qty"
+  },
+  {
+   "fieldname": "wastage_percent",
+   "fieldtype": "Percent",
+   "label": "Wastage Allowance %"
+  },
+  {
+   "default": "Branch Consumables Warehouse",
+   "fieldname": "source_warehouse_policy",
+   "fieldtype": "Select",
+   "label": "Source Warehouse Policy",
+   "options": "Branch Consumables Warehouse\nBeautician Warehouse\nBranch Default Warehouse"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Data",
+   "label": "Notes"
+  }
+ ],
+ "istable": 1,
+ "module": "Beauty Cloud",
+ "name": "Beauty Service Recipe Item",
+ "permissions": []
+}

@@ -1,0 +1,444 @@
+{
+ "app": "beauty_cloud",
+ "charts": [],
+ "content": "[{\"id\": \"bc-header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Beauty Cloud</b></span>\", \"col\": 12}}, {\"id\": \"bc-sc-0\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Beauty Appointment\", \"col\": 3}}, {\"id\": \"bc-sc-1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Beauty Service\", \"col\": 3}}, {\"id\": \"bc-sc-2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Beauty Branch\", \"col\": 3}}, {\"id\": \"bc-sc-3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Beauty Cloud Settings\", \"col\": 3}}, {\"id\": \"bc-sc-4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Beauty POS Transaction\", \"col\": 3}}, {\"id\": \"bc-card-0\", \"type\": \"card\", \"data\": {\"card_name\": \"Setup & SaaS\", \"col\": 4}}, {\"id\": \"bc-card-1\", \"type\": \"card\", \"data\": {\"card_name\": \"Salon Masters\", \"col\": 4}}, {\"id\": \"bc-card-2\", \"type\": \"card\", \"data\": {\"card_name\": \"Scheduling & Appointments\", \"col\": 4}}, {\"id\": \"bc-card-3\", \"type\": \"card\", \"data\": {\"card_name\": \"Consultation & Products\", \"col\": 4}}, {\"id\": \"bc-card-4\", \"type\": \"card\", \"data\": {\"card_name\": \"Inventory\", \"col\": 4}}, {\"id\": \"bc-card-5\", \"type\": \"card\", \"data\": {\"card_name\": \"POS\", \"col\": 4}}, {\"id\": \"bc-card-6\", \"type\": \"card\", \"data\": {\"card_name\": \"Loyalty\", \"col\": 4}}, {\"id\": \"bc-card-7\", \"type\": \"card\", \"data\": {\"card_name\": \"Commission & Consumption\", \"col\": 4}}, {\"id\": \"bc-card-8\", \"type\": \"card\", \"data\": {\"card_name\": \"Audit\", \"col\": 4}}]",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "sparkle",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Beauty Cloud",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Setup & SaaS",
+   "link_count": 5,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Cloud Settings",
+   "link_count": 0,
+   "link_to": "Beauty Cloud Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Cloud Branding Settings",
+   "link_count": 0,
+   "link_to": "Beauty Cloud Branding Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Cloud Plan",
+   "link_count": 0,
+   "link_to": "Beauty Cloud Plan",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Cloud Tenant",
+   "link_count": 0,
+   "link_to": "Beauty Cloud Tenant",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Kiosk Device",
+   "link_count": 0,
+   "link_to": "Beauty Kiosk Device",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Salon Masters",
+   "link_count": 8,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Branch",
+   "link_count": 0,
+   "link_to": "Beauty Branch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Branch Schedule",
+   "link_count": 0,
+   "link_to": "Beauty Branch Schedule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Service Category",
+   "link_count": 0,
+   "link_to": "Beauty Service Category",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Service",
+   "link_count": 0,
+   "link_to": "Beauty Service",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Service Recipe",
+   "link_count": 0,
+   "link_to": "Beauty Service Recipe",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Service Package",
+   "link_count": 0,
+   "link_to": "Beauty Service Package",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee (Beauticians)",
+   "link_count": 0,
+   "link_to": "Employee",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Service Skill",
+   "link_count": 0,
+   "link_to": "Employee Service Skill",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Scheduling & Appointments",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Employee Schedule",
+   "link_count": 0,
+   "link_to": "Beauty Employee Schedule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Appointment",
+   "link_count": 0,
+   "link_to": "Beauty Appointment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Cloud OTP Request",
+   "link_count": 0,
+   "link_to": "Beauty Cloud OTP Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Consultation & Products",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Consultation",
+   "link_count": 0,
+   "link_to": "Beauty Consultation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Product Recommendation",
+   "link_count": 0,
+   "link_to": "Beauty Product Recommendation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Inventory",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Inventory Count",
+   "link_count": 0,
+   "link_to": "Beauty Inventory Count",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Employee Stock Profile",
+   "link_count": 0,
+   "link_to": "Beauty Employee Stock Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS",
+   "link_count": 1,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty POS Transaction",
+   "link_count": 0,
+   "link_to": "Beauty POS Transaction",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Loyalty",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Customer Wallet",
+   "link_count": 0,
+   "link_to": "Beauty Customer Wallet",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Gift Card",
+   "link_count": 0,
+   "link_to": "Beauty Gift Card",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commission & Consumption",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commission Rule",
+   "link_count": 0,
+   "link_to": "Commission Rule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Commission Ledger",
+   "link_count": 0,
+   "link_to": "Commission Ledger",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Service Consumption",
+   "link_count": 0,
+   "link_to": "Service Consumption",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Audit",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Booking Payment",
+   "link_count": 0,
+   "link_to": "Beauty Booking Payment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Beauty Cloud Audit Log",
+   "link_count": 0,
+   "link_to": "Beauty Cloud Audit Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "module": "Beauty Cloud",
+ "name": "Beauty Cloud",
+ "number_cards": [],
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 5.0,
+ "shortcuts": [
+  {
+   "color": "Purple",
+   "doc_view": "List",
+   "label": "Beauty Appointment",
+   "link_to": "Beauty Appointment",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Beauty Service",
+   "link_to": "Beauty Service",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Beauty Branch",
+   "link_to": "Beauty Branch",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Beauty Cloud Settings",
+   "link_to": "Beauty Cloud Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Beauty POS Transaction",
+   "link_to": "Beauty POS Transaction",
+   "type": "DocType"
+  }
+ ],
+ "title": "Beauty Cloud",
+ "type": "Workspace"
+}

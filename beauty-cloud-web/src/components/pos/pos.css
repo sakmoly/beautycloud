@@ -1,0 +1,256 @@
+/* POS — Baheya / Fresha-inspired salon checkout */
+
+.pos-shell {
+  min-height: calc(100vh - 8rem);
+}
+
+.pos-shell.pos-compact {
+  min-height: calc(100vh - 6rem);
+}
+
+
+.pos-list-hero {
+  /* uses .bc-hero from globals */
+}
+
+/* Order cards */
+.pos-order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-radius: var(--bc-radius-lg);
+  border: 1px solid var(--bc-border);
+  background: #fff;
+  padding: 1rem 1.125rem;
+  text-align: left;
+  box-shadow: var(--bc-shadow);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.pos-order-card:hover {
+  transform: translateY(-2px);
+  border-color: rgb(244 164 181 / 0.5);
+  box-shadow: var(--bc-shadow-lg);
+}
+
+.pos-order-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.pos-order-card-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.pos-order-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pos-order-card-ref {
+  font-size: 0.6875rem;
+  color: var(--bc-muted);
+  margin-top: 0.125rem;
+}
+
+.pos-order-card-services {
+  font-size: 0.8125rem;
+  color: var(--bc-muted);
+  line-height: 1.4;
+}
+
+.pos-order-card-price {
+  margin-top: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--bc-secondary);
+}
+
+/* Catalogue panel */
+.pos-catalog {
+  border-radius: var(--bc-radius-lg);
+  border: 1px solid var(--bc-border);
+  background: #fff;
+  box-shadow: var(--bc-shadow);
+  overflow: hidden;
+}
+
+.pos-catalog-toolbar {
+  padding: 1rem 1.125rem;
+  background: linear-gradient(180deg, var(--bc-accent-muted) 0%, #fff 100%);
+  border-bottom: 1px solid var(--bc-border);
+}
+
+.pos-catalog-scroll {
+  max-height: calc(100vh - 11rem);
+  overflow-y: auto;
+}
+
+.pos-categories-row {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 1rem 1.125rem;
+  border-bottom: 1px solid var(--bc-border);
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.pos-categories-row::-webkit-scrollbar {
+  display: none;
+}
+
+.pos-services-list {
+  padding: 0.25rem 0;
+}
+
+/* Product grid tiles (beige discover style) */
+.pos-product-grid {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.pos-product-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0.75rem;
+  border-radius: var(--bc-radius);
+  border: 1px solid transparent;
+  background: var(--bc-beige);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.pos-product-tile:hover {
+  background: #fff;
+  border-color: var(--bc-border);
+  box-shadow: var(--bc-shadow);
+  transform: translateY(-2px);
+}
+
+.pos-product-tile-icon {
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.875rem;
+  background: #fff;
+  font-size: 1.35rem;
+}
+
+.pos-product-tile-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.pos-product-tile-price {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--bc-secondary);
+}
+
+/* Ticket / cart sidebar */
+.pos-ticket {
+  border-radius: var(--bc-radius-lg);
+  border: 1px solid var(--bc-border);
+  background: #fff;
+  box-shadow: var(--bc-shadow-lg);
+}
+
+.pos-ticket-header {
+  padding: 1rem 1.125rem;
+  background: var(--bc-hero-gradient);
+  border-bottom: 1px solid var(--bc-border);
+  border-radius: var(--bc-radius-lg) var(--bc-radius-lg) 0 0;
+}
+
+.pos-ticket-scroll {
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.pos-ticket-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--bc-accent-muted);
+  font-size: 0.8125rem;
+}
+
+.pos-ticket-footer {
+  padding: 1rem 1.125rem;
+  border-top: 1px solid var(--bc-border);
+}
+
+.pos-ticket-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+.pos-ticket-total-amount {
+  color: var(--bc-secondary);
+  font-size: 1.375rem;
+}
+
+/* Pills — reuse bc-chip semantics */
+.pos-pill {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pos-pill.active {
+  background: var(--bc-primary);
+  color: #fff;
+}
+
+.pos-pill.inactive {
+  background: var(--bc-accent-muted);
+  color: var(--bc-text);
+}
+
+.pos-pill.inactive:hover {
+  background: var(--bc-accent-light);
+}
+
+.pos-filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  padding: 1.125rem;
+  border-radius: var(--bc-radius-lg);
+  border: 1px solid var(--bc-border);
+  background: #fff;
+  box-shadow: var(--bc-shadow);
+}
+
+.pos-empty-state {
+  grid-column: 1 / -1;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  border-radius: var(--bc-radius-lg);
+  border: 2px dashed var(--bc-border);
+  background: var(--bc-accent-muted);
+  color: var(--bc-muted);
+}

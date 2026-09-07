@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:CR-{company}-{#####}",
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "beauty_branch",
+  "employee",
+  "column_break_scope",
+  "beauty_service",
+  "service_category",
+  "section_break_rule",
+  "commission_method",
+  "rate_or_amount",
+  "effective_from",
+  "effective_to",
+  "is_active",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "beauty_branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Beauty Branch"
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "beauty_service",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Beauty Service",
+   "options": "Beauty Service"
+  },
+  {
+   "fieldname": "service_category",
+   "fieldtype": "Link",
+   "label": "Service Category",
+   "options": "Beauty Service Category"
+  },
+  {
+   "fieldname": "section_break_rule",
+   "fieldtype": "Section Break",
+   "label": "Commission Rule"
+  },
+  {
+   "default": "Percentage of Net After Material Cost",
+   "fieldname": "commission_method",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Commission Method",
+   "options": "Fixed Amount\nPercentage of Gross\nPercentage of Net After Discount\nPercentage of Net After Material Cost",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rate_or_amount",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Rate / Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Date",
+   "label": "Effective From"
+  },
+  {
+   "fieldname": "effective_to",
+   "fieldtype": "Date",
+   "label": "Effective To"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "module": "Beauty Cloud",
+ "name": "Commission Rule",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Beauty Cloud Branch Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

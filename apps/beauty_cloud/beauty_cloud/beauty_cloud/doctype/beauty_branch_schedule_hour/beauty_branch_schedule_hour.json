@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "creation": "2026-09-06 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "weekday",
+  "open_time",
+  "close_time",
+  "is_closed"
+ ],
+ "fields": [
+  {
+   "fieldname": "weekday",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Weekday",
+   "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "reqd": 1
+  },
+  {
+   "fieldname": "open_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Open Time"
+  },
+  {
+   "fieldname": "close_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Close Time"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_closed",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Closed"
+  }
+ ],
+ "istable": 1,
+ "module": "Beauty Cloud",
+ "name": "Beauty Branch Schedule Hour",
+ "permissions": []
+}
