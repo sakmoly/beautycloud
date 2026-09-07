@@ -74,6 +74,7 @@ def load_demo_data():
 	_create_branding(company)
 	_create_service_categories(company)
 	_create_services(company)
+	_ensure_pos_registers(company)
 	frappe.db.commit()
 
 
@@ -193,3 +194,43 @@ def _create_services(company: str):
 				"allow_salon": 1,
 			}
 		).insert(ignore_permissions=True)
+
+
+def _ensure_pos_registers(company: str):
+	if not frappe.db.exists("Beauty Branch", "BBY-MAIN"):
+		return
+
+	frappe.db.set_value(
+		"Beauty Branch",
+		"BBY-MAIN",
+		{
+			"require_business_day_for_pos": 1,
+			"require_register_session_for_pos": 1,
+			"require_all_registers_closed_for_day_close": 1,
+			"business_day_cutoff_time": "03:00:00",
+		},
+	)
+
+	registers = [
+		("REG-01", "Front Desk Counter"),
+		("REG-02", "Back Desk Counter"),
+	]
+	for code, name in registers:
+		if frappe.db.exists("Beauty POS Register", code):
+			continue
+		doc = frappe.get_doc(
+			{
+				"doctype": "Beauty POS Register",
+				"register_code": code,
+				"register_name": name,
+				"beauty_branch": "BBY-MAIN",
+				"company": company,
+				"is_active": 1,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+
+	from beauty_cloud.services.register_session import get_open_business_day, open_business_day
+
+	if not get_open_business_day("BBY-MAIN"):
+		open_business_day("BBY-MAIN")

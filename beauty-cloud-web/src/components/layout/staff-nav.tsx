@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { InstallAppButton } from "@/components/layout/install-app-prompt";
 import { withBasePath } from "@/lib/base-path";
 
 const NAV = [
@@ -48,6 +49,7 @@ export function StaffNav({ compact = false }: { compact?: boolean }) {
           </Link>
         );
       })}
+      <InstallAppButton />
     </nav>
   );
 }

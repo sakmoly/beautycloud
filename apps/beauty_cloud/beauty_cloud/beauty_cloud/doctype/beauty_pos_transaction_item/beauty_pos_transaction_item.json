@@ -14,7 +14,11 @@
   "discount_amount",
   "amount",
   "employee",
-  "recommended_by"
+  "recommended_by",
+  "column_break_fulfillment",
+  "fulfillment_status",
+  "delivered_at",
+  "delivered_by"
  ],
  "fields": [
   {
@@ -81,6 +85,32 @@
    "fieldtype": "Link",
    "label": "Recommended By",
    "options": "Employee"
+  },
+  {
+   "fieldname": "column_break_fulfillment",
+   "fieldtype": "Column Break",
+   "label": "Handoff"
+  },
+  {
+   "default": "N/A",
+   "fieldname": "fulfillment_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Fulfillment Status",
+   "options": "Pending\nDelivered\nN/A"
+  },
+  {
+   "fieldname": "delivered_at",
+   "fieldtype": "Datetime",
+   "label": "Delivered At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivered_by",
+   "fieldtype": "Link",
+   "label": "Delivered By",
+   "options": "User",
+   "read_only": 1
   }
  ],
  "istable": 1,

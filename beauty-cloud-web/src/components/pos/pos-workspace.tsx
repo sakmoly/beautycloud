@@ -10,6 +10,7 @@ import {
   getBranches,
   getPosCatalogue,
   getPosOrders,
+  getPosSessionContext,
   getPosPaymentMethods,
   getPosProductGroups,
   getPosServiceCategories,
@@ -40,12 +41,53 @@ import {
   serviceIcon,
 } from "@/components/pos/pos-utils";
 import { printPosReceipt } from "@/components/pos/pos-receipt-print";
+import { loadStoredRegister } from "@/components/pos/pos-register-store";
+import type { PosSessionContext } from "@/components/pos/pos-session-types";
+import { evaluatePosCheckoutReady } from "@/components/pos/pos-session-utils";
+import { PosFulfillmentScreen } from "@/components/pos/pos-fulfillment-screen";
+import { PosSessionScreen } from "@/components/pos/pos-session-screen";
+import { PosSessionStatus } from "@/components/pos/pos-session-status";
 
 const WALKIN_CUSTOMER = "Walk-In Guest";
 
+type WorkspaceTab = "orders" | "pickup" | "session";
 type Screen = "list" | "order";
 type CatalogueTab = "services" | "products";
 type OrderFilter = "all" | "unpaid" | "waiting";
+
+function PosTopTabs({
+  active,
+  onChange,
+}: {
+  active: WorkspaceTab;
+  onChange: (tab: WorkspaceTab) => void;
+}) {
+  return (
+    <div className="pos-top-tabs">
+      <button
+        type="button"
+        className={`pos-top-tab ${active === "orders" ? "active" : ""}`}
+        onClick={() => onChange("orders")}
+      >
+        Orders
+      </button>
+      <button
+        type="button"
+        className={`pos-top-tab ${active === "pickup" ? "active" : ""}`}
+        onClick={() => onChange("pickup")}
+      >
+        Retail pickup
+      </button>
+      <button
+        type="button"
+        className={`pos-top-tab ${active === "session" ? "active" : ""}`}
+        onClick={() => onChange("session")}
+      >
+        Register &amp; Day
+      </button>
+    </div>
+  );
+}
 
 const EMPTY_CART: PosCartItem[] = [];
 
@@ -86,6 +128,11 @@ export function PosWorkspace() {
   const [selectedPayment, setSelectedPayment] = useState("Cash");
 
   const [receipt, setReceipt] = useState<Record<string, unknown> | null>(null);
+  const [posReady, setPosReady] = useState(false);
+  const [posBlockReason, setPosBlockReason] = useState<string | null>(
+    "Checking register session…",
+  );
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("orders");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -306,6 +353,31 @@ export function PosWorkspace() {
       setError("Add at least one service or product.");
       return;
     }
+
+    const paired = loadStoredRegister();
+    try {
+      const ctx = (await getPosSessionContext({
+        beauty_branch: branch,
+        register_code: paired?.register_code,
+        register_api_key: paired?.register_api_key,
+      })) as PosSessionContext;
+      const gate = evaluatePosCheckoutReady(ctx, Boolean(paired));
+      if (!gate.ready) {
+        setPosReady(false);
+        setPosBlockReason(gate.reason);
+        setError(gate.reason ?? "POS session is not ready for checkout.");
+        return;
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not verify POS session");
+      return;
+    }
+
+    if (!posReady) {
+      setError(posBlockReason ?? "Open Register & Day before checkout.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -315,6 +387,8 @@ export function PosWorkspace() {
         beauty_appointment: linkedAppointment,
         items,
         payments: [{ mode_of_payment: selectedPayment, amount: grandTotal }],
+        register_code: paired?.register_code,
+        register_api_key: paired?.register_api_key,
       })) as { name?: string; invoice?: string };
       setReceipt(result as Record<string, unknown>);
       setPaymentStatus("Paid");
@@ -339,9 +413,28 @@ export function PosWorkspace() {
     return <LoadingState title="Loading POS" description="Preparing checkout workspace" />;
   }
 
+  if (workspaceTab === "session" && screen === "list") {
+    return (
+      <div className="pos-shell pos-compact space-y-4">
+        <PosTopTabs active={workspaceTab} onChange={setWorkspaceTab} />
+        <PosSessionScreen branch={branch} onReadyChange={setPosReady} />
+      </div>
+    );
+  }
+
+  if (workspaceTab === "pickup" && screen === "list") {
+    return (
+      <div className="pos-shell pos-compact space-y-4">
+        <PosTopTabs active={workspaceTab} onChange={setWorkspaceTab} />
+        <PosFulfillmentScreen branch={branch} />
+      </div>
+    );
+  }
+
   if (screen === "list") {
     return (
       <div className="pos-shell pos-compact space-y-4">
+        <PosTopTabs active={workspaceTab} onChange={setWorkspaceTab} />
         <div className="bc-hero flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-[color:var(--bc-muted)]">Checkout desk</p>
@@ -350,6 +443,15 @@ export function PosWorkspace() {
           </div>
           <Button onClick={startNewOrder}>+ New sale</Button>
         </div>
+
+        <PosSessionStatus
+          branch={branch}
+          onReadyChange={(ready, reason) => {
+            setPosReady(ready);
+            setPosBlockReason(reason ?? null);
+          }}
+          onManage={() => setWorkspaceTab("session")}
+        />
 
         <div className="pos-filters-bar">
           <div className="min-w-[140px] flex-1">
@@ -457,6 +559,18 @@ export function PosWorkspace() {
           <Badge tone={paymentTone(paymentStatus)}>{paymentStatus ?? "Unpaid"}</Badge>
         ) : null}
       </div>
+
+      <PosSessionStatus
+        branch={branch}
+        onReadyChange={(ready, reason) => {
+          setPosReady(ready);
+          setPosBlockReason(reason ?? null);
+        }}
+        onManage={() => {
+          setScreen("list");
+          setWorkspaceTab("session");
+        }}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <section className="pos-catalog flex flex-col overflow-hidden">
@@ -710,9 +824,24 @@ export function PosWorkspace() {
                 </Button>
               </div>
             ) : (
-              <Button className="w-full" onClick={() => void completePayment()} disabled={busy || items.length === 0}>
-                {busy ? "Processing…" : `Pay · SAR ${grandTotal}`}
-              </Button>
+              <>
+                {!posReady && posBlockReason ? (
+                  <p className="rounded-2xl border border-[color:var(--bc-warning)]/40 bg-[color:var(--bc-warning)]/10 px-3 py-2 text-xs text-[color:var(--bc-warning)]">
+                    {posBlockReason}
+                  </p>
+                ) : null}
+                <Button
+                  className="w-full"
+                  onClick={() => void completePayment()}
+                  disabled={busy || items.length === 0 || !posReady}
+                >
+                  {busy
+                    ? "Processing…"
+                    : !posReady
+                      ? "Open register to pay"
+                      : `Pay · SAR ${grandTotal}`}
+                </Button>
+              </>
             )}
           </div>
         </aside>

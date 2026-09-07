@@ -396,6 +396,96 @@ export async function getPosPaymentMethods() {
   });
 }
 
+export async function getPosSessionContext(input: {
+  beauty_branch: string;
+  register_code?: string;
+  register_api_key?: string;
+}) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.pos.session_context",
+    params: input,
+  });
+}
+
+export async function openPosBusinessDay(input: {
+  beauty_branch: string;
+  business_date?: string;
+  notes?: string;
+}) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.register.open_day",
+    params: input,
+  });
+}
+
+export async function pairPosRegister(input: {
+  register_code: string;
+  register_api_key: string;
+  beauty_branch?: string;
+}) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.register.pair_register",
+    params: input,
+  });
+}
+
+export async function unpairPosRegister(input: { register_code: string; register_api_key: string }) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.register.unpair_register_device",
+    params: input,
+  });
+}
+
+export async function openPosRegisterSession(input: {
+  register_code: string;
+  register_api_key: string;
+  opening_float?: number;
+}) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.register.open_register",
+    params: input,
+  });
+}
+
+export async function closePosRegisterSession(input: { session: string; closing_cash: number; notes?: string }) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.register.close_register",
+    params: input,
+  });
+}
+
+export async function closePosBusinessDay(input: {
+  beauty_branch?: string;
+  name?: string;
+  notes?: string;
+}) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.register.close_day",
+    params: input,
+  });
+}
+
+export async function getPosFulfillmentQueue(input: {
+  beauty_branch: string;
+  business_date?: string;
+  status?: string;
+  search?: string;
+  page?: number;
+  page_size?: number;
+}) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.pos.get_fulfillment_queue",
+    params: input,
+  });
+}
+
+export async function markPosItemsDelivered(lineNames: string[]) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.pos.mark_delivered",
+    body: { line_names: lineNames.filter(Boolean) },
+  });
+}
+
 export async function loadPosAppointment(name: string) {
   return callBeautyMethod<{
     beauty_appointment?: string;

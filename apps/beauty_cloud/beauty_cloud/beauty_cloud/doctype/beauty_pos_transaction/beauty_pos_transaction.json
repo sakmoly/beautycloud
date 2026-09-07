@@ -16,6 +16,13 @@
   "source",
   "status",
   "posting_date",
+  "business_date",
+  "section_break_session",
+  "beauty_business_day",
+  "beauty_register_session",
+  "beauty_pos_register",
+  "register_code",
+  "cashier",
   "section_break_invoice",
   "invoice_doctype",
   "invoice",
@@ -103,6 +110,45 @@
    "fieldname": "posting_date",
    "fieldtype": "Date",
    "label": "Posting Date"
+  },
+  {
+   "fieldname": "business_date",
+   "fieldtype": "Date",
+   "label": "Business Date"
+  },
+  {
+   "fieldname": "section_break_session",
+   "fieldtype": "Section Break",
+   "label": "Session"
+  },
+  {
+   "fieldname": "beauty_business_day",
+   "fieldtype": "Link",
+   "label": "Business Day",
+   "options": "Beauty Business Day"
+  },
+  {
+   "fieldname": "beauty_register_session",
+   "fieldtype": "Link",
+   "label": "Register Session",
+   "options": "Beauty Register Session"
+  },
+  {
+   "fieldname": "beauty_pos_register",
+   "fieldtype": "Link",
+   "label": "POS Register",
+   "options": "Beauty POS Register"
+  },
+  {
+   "fieldname": "register_code",
+   "fieldtype": "Data",
+   "label": "Register Code"
+  },
+  {
+   "fieldname": "cashier",
+   "fieldtype": "Link",
+   "label": "Cashier",
+   "options": "User"
   },
   {
    "fieldname": "section_break_invoice",
@@ -219,8 +265,10 @@
    "write": 1
   },
   {
+   "create": 1,
    "read": 1,
-   "role": "Beauty Cloud Receptionist"
+   "role": "Beauty Cloud Receptionist",
+   "write": 1
   }
  ],
  "sort_field": "modified",

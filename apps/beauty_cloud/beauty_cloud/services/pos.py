@@ -60,6 +60,10 @@ def checkout(cart: dict) -> dict:
 			_("Outstanding amount {0} must be settled").format(validated["outstanding_amount"])
 		)
 
+	from beauty_cloud.services.register_session import resolve_checkout_session
+
+	session = resolve_checkout_session(validated | cart)
+
 	tx = frappe.get_doc(
 		{
 			"doctype": "Beauty POS Transaction",
@@ -70,7 +74,13 @@ def checkout(cart: dict) -> dict:
 			"beauty_appointment": validated.get("beauty_appointment"),
 			"source": validated.get("source") or "POS",
 			"status": "Draft",
-			"posting_date": getdate(today()),
+			"posting_date": session["business_date"],
+			"business_date": session["business_date"],
+			"beauty_business_day": session.get("beauty_business_day"),
+			"beauty_register_session": session.get("beauty_register_session"),
+			"beauty_pos_register": session.get("beauty_pos_register"),
+			"register_code": session.get("register_code"),
+			"cashier": session.get("cashier"),
 			"items": validated["items"],
 			"payments": validated.get("payments") or [],
 			"notes": cart.get("notes"),
@@ -239,6 +249,7 @@ def _normalize_cart_line(row: dict, company: str) -> dict:
 			"amount": qty * rate - discount,
 			"employee": row.get("employee"),
 			"recommended_by": row.get("recommended_by"),
+			"fulfillment_status": "N/A",
 		}
 
 	item_code = row.item
@@ -246,6 +257,8 @@ def _normalize_cart_line(row: dict, company: str) -> dict:
 		frappe.throw(_("Item or beauty service is required on cart line"))
 	if not rate:
 		rate = flt(frappe.db.get_value("Item", item_code, "standard_rate"))
+	from beauty_cloud.services.retail_fulfillment import default_fulfillment_status
+
 	return {
 		"line_type": row.get("line_type") or "Item",
 		"item": item_code,
@@ -256,6 +269,7 @@ def _normalize_cart_line(row: dict, company: str) -> dict:
 		"amount": qty * rate - discount,
 		"employee": row.get("employee"),
 		"recommended_by": row.get("recommended_by"),
+		"fulfillment_status": default_fulfillment_status(row.get("line_type") or "Item", item_code),
 	}
 
 

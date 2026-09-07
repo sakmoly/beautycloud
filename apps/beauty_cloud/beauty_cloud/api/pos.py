@@ -98,3 +98,39 @@ def barcode_lookup(barcode: str, beauty_branch: str):
 @frappe.whitelist()
 def payment_methods(channel: str = "pos"):
 	return get_payment_methods(channel)
+
+
+@frappe.whitelist()
+def session_context(beauty_branch: str, register_code: str | None = None, register_api_key: str | None = None):
+	from beauty_cloud.services.register_session import get_pos_session_context
+
+	return get_pos_session_context(beauty_branch, register_code, register_api_key)
+
+
+@frappe.whitelist()
+def get_fulfillment_queue(
+	beauty_branch: str,
+	business_date: str | None = None,
+	status: str = "pending",
+	search: str | None = None,
+	page: int = 1,
+	page_size: int = 50,
+):
+	from beauty_cloud.services.retail_fulfillment import get_fulfillment_queue as _get
+
+	return _get(beauty_branch, business_date, status, search, int(page), int(page_size))
+
+
+@frappe.whitelist()
+def mark_delivered(line_names=None, data=None, **kwargs):
+	from beauty_cloud.services.retail_fulfillment import mark_items_delivered
+
+	payload = parse_payload(data, line_names=line_names, **kwargs)
+	names = payload.get("line_names", line_names)
+	if isinstance(names, str):
+		import json
+
+		names = json.loads(names)
+	if not isinstance(names, list):
+		names = [names] if names else []
+	return mark_items_delivered([str(name) for name in names if name])

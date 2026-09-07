@@ -16,6 +16,11 @@
   "retail_warehouse",
   "consumables_warehouse",
   "default_warehouse",
+  "section_break_pos_sessions",
+  "require_business_day_for_pos",
+  "require_register_session_for_pos",
+  "require_all_registers_closed_for_day_close",
+  "business_day_cutoff_time",
   "section_break_contact",
   "phone",
   "email",
@@ -85,6 +90,38 @@
    "fieldtype": "Link",
    "label": "Default Warehouse",
    "options": "Warehouse"
+  },
+  {
+   "fieldname": "section_break_pos_sessions",
+   "fieldtype": "Section Break",
+   "label": "POS Sessions"
+  },
+  {
+   "default": "1",
+   "description": "POS checkout requires an open business day for this branch.",
+   "fieldname": "require_business_day_for_pos",
+   "fieldtype": "Check",
+   "label": "Require Business Day for POS"
+  },
+  {
+   "default": "1",
+   "description": "POS checkout requires an open register session on a paired terminal.",
+   "fieldname": "require_register_session_for_pos",
+   "fieldtype": "Check",
+   "label": "Require Register Session for POS"
+  },
+  {
+   "default": "1",
+   "description": "Branch business day cannot close until all register sessions are closed.",
+   "fieldname": "require_all_registers_closed_for_day_close",
+   "fieldtype": "Check",
+   "label": "Require All Registers Closed for Day Close"
+  },
+  {
+   "description": "Optional advisory cutoff (e.g. 03:00). Does not auto-open or auto-close sessions.",
+   "fieldname": "business_day_cutoff_time",
+   "fieldtype": "Time",
+   "label": "Business Day Cutoff Time"
   },
   {
    "fieldname": "section_break_contact",
