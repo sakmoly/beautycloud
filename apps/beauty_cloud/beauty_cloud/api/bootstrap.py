@@ -8,6 +8,7 @@ from beauty_cloud.beauty_cloud.doctype.beauty_cloud_settings.beauty_cloud_settin
 from beauty_cloud.services.booking_payment import get_booking_payment_settings
 from beauty_cloud.services.payment_gate import get_salon_payment_settings
 from beauty_cloud.services.branding import get_resolved_branding
+from beauty_cloud.services.web_content import get_public_footer_navigation, get_public_navigation
 
 
 @frappe.whitelist(allow_guest=True)
@@ -34,6 +35,8 @@ def get_public_bootstrap(company: str | None = None, branch: str | None = None):
 		"booking_payment": payment_settings,
 		"salon_payment": get_salon_payment_settings(),
 		"branding": branding,
+		"navigation": get_public_navigation(company, branch),
+		"footer_navigation": get_public_footer_navigation(company, branch),
 	}
 
 

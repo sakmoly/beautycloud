@@ -17,6 +17,18 @@
   "logo_dark",
   "favicon",
   "booking_header_image",
+  "promo_bar_enabled",
+  "promo_bar_text",
+  "hero_slides",
+  "section_break_marketing",
+  "tagline",
+  "hero_title",
+  "hero_subtitle",
+  "about_teaser",
+  "instagram_url",
+  "facebook_url",
+  "twitter_url",
+  "tiktok_url",
   "section_break_theme",
   "theme_mode",
   "primary_color",
@@ -30,6 +42,9 @@
   "warning_color",
   "danger_color",
   "border_radius_style",
+  "section_break_navigation",
+  "menu_items",
+  "footer_menu_items",
   "section_break_support",
   "support_email",
   "support_phone",
@@ -98,6 +113,68 @@
    "label": "Booking Header Image"
   },
   {
+   "default": "0",
+   "fieldname": "promo_bar_enabled",
+   "fieldtype": "Check",
+   "label": "Show Promo Bar"
+  },
+  {
+   "fieldname": "promo_bar_text",
+   "fieldtype": "Data",
+   "label": "Promo Bar Text"
+  },
+  {
+   "fieldname": "hero_slides",
+   "fieldtype": "Table",
+   "label": "Hero Carousel Slides",
+   "options": "Beauty Hero Slide"
+  },
+  {
+   "fieldname": "section_break_marketing",
+   "fieldtype": "Section Break",
+   "label": "Marketing Website"
+  },
+  {
+   "fieldname": "tagline",
+   "fieldtype": "Data",
+   "label": "Tagline"
+  },
+  {
+   "fieldname": "hero_title",
+   "fieldtype": "Data",
+   "label": "Hero Title"
+  },
+  {
+   "fieldname": "hero_subtitle",
+   "fieldtype": "Small Text",
+   "label": "Hero Subtitle"
+  },
+  {
+   "fieldname": "about_teaser",
+   "fieldtype": "Small Text",
+   "label": "About Teaser (Home Page)"
+  },
+  {
+   "fieldname": "instagram_url",
+   "fieldtype": "Data",
+   "label": "Instagram URL"
+  },
+  {
+   "fieldname": "facebook_url",
+   "fieldtype": "Data",
+   "label": "Facebook URL"
+  },
+  {
+   "fieldname": "twitter_url",
+   "fieldtype": "Data",
+   "label": "X (Twitter) URL"
+  },
+  {
+   "fieldname": "tiktok_url",
+   "fieldtype": "Data",
+   "label": "TikTok URL"
+  },
+  {
    "fieldname": "section_break_theme",
    "fieldtype": "Section Break",
    "label": "Theme"
@@ -110,19 +187,19 @@
    "options": "Light\nDark\nSystem"
   },
   {
-   "default": "#6B4EFF",
+   "default": "#5B2C6F",
    "fieldname": "primary_color",
    "fieldtype": "Color",
    "label": "Primary Color"
   },
   {
-   "default": "#1A1A2E",
+   "default": "#E91E8C",
    "fieldname": "secondary_color",
    "fieldtype": "Color",
    "label": "Secondary Color"
   },
   {
-   "default": "#E8B4BC",
+   "default": "#F4A5C8",
    "fieldname": "accent_color",
    "fieldtype": "Color",
    "label": "Accent Color"
@@ -134,7 +211,7 @@
    "label": "Background Color"
   },
   {
-   "default": "#F8F5FF",
+   "default": "#FFF5F9",
    "fieldname": "surface_color",
    "fieldtype": "Color",
    "label": "Surface Color"
@@ -175,6 +252,24 @@
    "fieldtype": "Select",
    "label": "Border Radius",
    "options": "sm\nmd\nlg\nfull"
+  },
+  {
+   "fieldname": "section_break_navigation",
+   "fieldtype": "Section Break",
+   "label": "Website Navigation"
+  },
+  {
+   "fieldname": "menu_items",
+   "fieldtype": "Table",
+   "label": "Header Menu Items",
+   "options": "Beauty Web Menu Item"
+  },
+  {
+   "description": "Links shown in the website footer Explore column",
+   "fieldname": "footer_menu_items",
+   "fieldtype": "Table",
+   "label": "Footer Menu Items",
+   "options": "Beauty Web Menu Item"
   },
   {
    "fieldname": "section_break_support",

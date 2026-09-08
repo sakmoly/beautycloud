@@ -1,5 +1,15 @@
 export type CssVariables = Record<string, string>;
 
+export interface HeroSlide {
+  image?: string | null;
+  eyebrow?: string | null;
+  title: string;
+  subtitle?: string | null;
+  cta_label?: string | null;
+  cta_link?: string | null;
+  sort_order?: number;
+}
+
 export interface Branding {
   application_title?: string;
   company_display_name?: string;
@@ -7,11 +17,166 @@ export interface Branding {
   logo_dark?: string | null;
   favicon?: string | null;
   booking_header_image?: string | null;
+  promo_bar_enabled?: boolean;
+  promo_bar_text?: string | null;
+  hero_slides?: HeroSlide[];
+  tagline?: string | null;
+  hero_title?: string | null;
+  hero_subtitle?: string | null;
+  about_teaser?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  twitter_url?: string | null;
+  tiktok_url?: string | null;
   theme_mode?: string;
   support_email?: string | null;
   support_phone?: string | null;
   custom_footer_text?: string | null;
+  menu_items?: WebMenuItem[];
+  footer_menu_items?: WebMenuItem[];
   css_variables?: CssVariables;
+}
+
+export interface WebMenuItem {
+  label: string;
+  url: string;
+  link_type?: "Internal" | "External" | "System";
+  parent_label?: string | null;
+  sort_order?: number;
+  is_visible?: boolean;
+  highlight?: boolean;
+  open_in_new_tab?: boolean;
+}
+
+export interface WebNavItem extends WebMenuItem {
+  children?: WebNavItem[];
+  source?: string;
+}
+
+export interface WebPageGalleryItem {
+  image?: string | null;
+  caption?: string | null;
+  sort_order?: number;
+}
+
+export interface WebPageWhyUsItem {
+  icon?: string | null;
+  title: string;
+  description?: string | null;
+  sort_order?: number;
+}
+
+export interface WebPageFaqItem {
+  question: string;
+  answer?: string | null;
+  sort_order?: number;
+}
+
+export interface PublicBranchSummary {
+  name: string;
+  branch_code?: string;
+  branch_name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+}
+
+export interface PublicStylistSummary {
+  name: string;
+  employee_name: string;
+  image?: string | null;
+  designation?: string | null;
+}
+
+export interface WebPageSection {
+  section_type:
+    | "Hero"
+    | "Trust Chips"
+    | "Why Us"
+    | "Services Grid"
+    | "Stylists"
+    | "Branches"
+    | "Text & Image"
+    | "CTA"
+    | "Book CTA"
+    | "Rich Text"
+    | "Image Banner"
+    | "Gallery"
+    | "FAQ";
+  title?: string | null;
+  subtitle?: string | null;
+  body?: string | null;
+  trust_chips?: string | null;
+  image?: string | null;
+  image_position?: "Left" | "Right";
+  link_label?: string | null;
+  link_url?: string | null;
+  secondary_link_label?: string | null;
+  secondary_link_url?: string | null;
+  embed_category?: string | null;
+  embed_limit?: number;
+  sort_order?: number;
+  gallery?: WebPageGalleryItem[];
+  why_us?: WebPageWhyUsItem[];
+  faq?: WebPageFaqItem[];
+  categories?: PublicCatalogCategory[];
+  branches?: PublicBranchSummary[];
+  stylists?: PublicStylistSummary[];
+}
+
+export interface WebPageContent {
+  page_slug: string;
+  page_template?: "Standard" | "Salon Landing";
+  title: string;
+  subtitle?: string | null;
+  meta_description?: string | null;
+  is_home_page?: boolean;
+  show_in_menu?: boolean;
+  menu_label?: string | null;
+  body?: string | null;
+  hero_image?: string | null;
+  sections?: WebPageSection[];
+  url?: string;
+}
+
+export interface WebPageSummary {
+  page_slug: string;
+  title: string;
+  subtitle?: string | null;
+  menu_label?: string;
+  show_in_menu?: boolean;
+  menu_sort_order?: number;
+  url?: string;
+}
+
+export interface PublicCatalogCategory {
+  name: string;
+  label: string;
+  label_ar?: string | null;
+  is_group: boolean;
+  sort_order: number;
+  image?: string | null;
+  child_count: number;
+  service_count: number;
+}
+
+export interface PublicCatalogService {
+  name: string;
+  service_code?: string;
+  service_name: string;
+  service_name_ar?: string | null;
+  service_category?: string;
+  default_duration?: number;
+  standard_selling_price?: number;
+  description?: string | null;
+}
+
+export interface PublicServiceCatalog {
+  parent?: PublicCatalogCategory | null;
+  categories: PublicCatalogCategory[];
+  services: PublicCatalogService[];
+  breadcrumb: Array<{ name: string; label: string }>;
+  level: "root" | "category" | "services";
 }
 
 export interface TenantInfo {
@@ -83,6 +248,8 @@ export interface PublicBootstrap {
   booking_payment?: BookingPaymentSettings;
   salon_payment?: SalonPaymentSettings;
   branding?: Branding;
+  navigation?: WebNavItem[];
+  footer_navigation?: WebNavItem[];
   tenant?: TenantInfo | null;
   plan?: PlanInfo | null;
   features?: FeatureFlags;

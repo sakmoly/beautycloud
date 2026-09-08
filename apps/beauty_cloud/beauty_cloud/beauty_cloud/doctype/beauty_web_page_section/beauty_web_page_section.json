@@ -1,0 +1,131 @@
+{
+ "actions": [],
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_type",
+  "is_visible",
+  "title",
+  "subtitle",
+  "body",
+  "trust_chips",
+  "image",
+  "image_position",
+  "link_label",
+  "link_url",
+  "secondary_link_label",
+  "secondary_link_url",
+  "embed_category",
+  "embed_limit",
+  "sort_order"
+ ],
+ "fields": [
+  {
+   "default": "Rich Text",
+   "fieldname": "section_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Section Type",
+   "options": "Hero\nTrust Chips\nWhy Us\nServices Grid\nStylists\nBranches\nText & Image\nCTA\nBook CTA\nRich Text\nImage Banner\nGallery\nFAQ",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Uncheck to hide this section on the public website without deleting it",
+   "fieldname": "is_visible",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Show on Website"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "body",
+   "fieldtype": "Text Editor",
+   "label": "Body"
+  },
+  {
+   "depends_on": "eval:doc.section_type=='Trust Chips'",
+   "description": "One chip per line. Add or remove lines anytime — the website updates automatically. Example: Since 2018",
+   "fieldname": "trust_chips",
+   "fieldtype": "Small Text",
+   "label": "Trust Chips"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "default": "Left",
+   "depends_on": "eval:doc.section_type=='Text & Image'",
+   "fieldname": "image_position",
+   "fieldtype": "Select",
+   "label": "Image Position",
+   "options": "Left\nRight"
+  },
+  {
+   "fieldname": "link_label",
+   "fieldtype": "Data",
+   "label": "Button Label"
+  },
+  {
+   "description": "Internal path (/book) or full URL",
+   "fieldname": "link_url",
+   "fieldtype": "Data",
+   "label": "Button Link"
+  },
+  {
+   "depends_on": "eval:['Hero','Book CTA','CTA'].includes(doc.section_type)",
+   "fieldname": "secondary_link_label",
+   "fieldtype": "Data",
+   "label": "Secondary Button Label"
+  },
+  {
+   "depends_on": "eval:['Hero','Book CTA','CTA'].includes(doc.section_type)",
+   "fieldname": "secondary_link_url",
+   "fieldtype": "Data",
+   "label": "Secondary Button Link"
+  },
+  {
+   "depends_on": "eval:doc.section_type=='Services Grid'",
+   "fieldname": "embed_category",
+   "fieldtype": "Link",
+   "label": "Category Filter",
+   "options": "Beauty Service Category"
+  },
+  {
+   "default": "3",
+   "depends_on": "eval:['Services Grid','Stylists','Branches'].includes(doc.section_type)",
+   "description": "Stylists: pulls live from Employee records with service skills. Set 0 for no limit.",
+   "fieldname": "embed_limit",
+   "fieldtype": "Int",
+   "label": "Item Limit"
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order"
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Web Page Section",
+ "owner": "Administrator",
+ "permissions": []
+}

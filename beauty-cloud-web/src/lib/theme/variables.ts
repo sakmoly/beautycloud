@@ -3,18 +3,20 @@ import type { CSSProperties } from "react";
 import type { CssVariables } from "@/lib/frappe/types";
 
 const FALLBACK_VARIABLES: CssVariables = {
-  "--bc-primary": "#1A1A1A",
-  "--bc-secondary": "#C2185B",
-  "--bc-accent": "#F4A4B5",
-  "--bc-background": "#FFFAFB",
-  "--bc-surface": "#FFFFFF",
-  "--bc-text": "#1F1F1F",
-  "--bc-muted": "#8B7E7E",
-  "--bc-success": "#2E7D52",
-  "--bc-warning": "#B45309",
-  "--bc-danger": "#C62828",
-  "--bc-border": "#F0E0E5",
-  "--bc-radius": "1.25rem",
+  "--bc-primary": "#5B2C6F",
+  "--bc-secondary": "#E91E8C",
+  "--bc-gold": "#E91E8C",
+  "--bc-accent": "#F4A5C8",
+  "--bc-tan": "#9D4EDD",
+  "--bc-background": "#FFFBFC",
+  "--bc-surface": "#FFF5F9",
+  "--bc-text": "#2D1B36",
+  "--bc-muted": "#8B6F96",
+  "--bc-success": "#059669",
+  "--bc-warning": "#D97706",
+  "--bc-danger": "#E11D48",
+  "--bc-border": "#F0D9E8",
+  "--bc-radius": "0.75rem",
 };
 
 export function mergeThemeVariables(

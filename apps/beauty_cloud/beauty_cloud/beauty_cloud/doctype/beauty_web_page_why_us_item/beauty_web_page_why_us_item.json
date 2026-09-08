@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "creation": "2026-09-08 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_sort_order",
+  "icon",
+  "title",
+  "description",
+  "sort_order"
+ ],
+ "fields": [
+  {
+   "description": "Matches Sort Order of a Why Us section on this page",
+   "fieldname": "section_sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Section Sort Order",
+   "reqd": 1
+  },
+  {
+   "description": "team, scissors, sparkle, booking, branch, star, shield, clock",
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Icon"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order"
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-09-08 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Web Page Why Us Item",
+ "owner": "Administrator",
+ "permissions": []
+}

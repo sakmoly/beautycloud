@@ -21,7 +21,7 @@ import type {
   ReceptionCalendarData,
   StockRow,
 } from "@/lib/api/types";
-import type { PublicBootstrap } from "@/lib/frappe/types";
+import type { PublicBootstrap, PublicServiceCatalog, WebPageContent } from "@/lib/frappe/types";
 import { withBasePath } from "@/lib/base-path";
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -37,6 +37,22 @@ export async function fetchBootstrap() {
     cache: "no-store",
   });
   return parseJson<PublicBootstrap>(response);
+}
+
+export async function getServiceCatalog(parentCategory?: string) {
+  return callBeautyMethod<PublicServiceCatalog>({
+    method: "beauty_cloud.api.catalog.get_service_catalog",
+    params: { parent_category: parentCategory, online_only: 1 },
+    guest: true,
+  });
+}
+
+export async function getWebPage(pageSlug: string) {
+  return callBeautyMethod<WebPageContent>({
+    method: "beauty_cloud.api.catalog.get_web_page",
+    params: { page_slug: pageSlug },
+    guest: true,
+  });
 }
 
 export async function callBeautyMethod<T>(input: {

@@ -1,0 +1,219 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:page_slug",
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "page_slug",
+  "title",
+  "subtitle",
+  "company",
+  "branch",
+  "column_break_1",
+  "page_template",
+  "published",
+  "is_home_page",
+  "show_in_menu",
+  "menu_label",
+  "sort_order",
+  "menu_sort_order",
+  "meta_description",
+  "section_break_content",
+  "hero_image",
+  "body",
+  "section_break_sections",
+  "sections",
+  "gallery_items",
+  "section_break_why_us",
+  "why_us_items",
+  "section_break_faq",
+  "faq_items"
+ ],
+ "fields": [
+  {
+   "description": "URL slug, e.g. about, contact, privacy. Home page uses slug \"home\".",
+   "fieldname": "page_slug",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Page Slug",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "description": "Optional branch-specific page override.",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Beauty Branch"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Standard",
+   "description": "Standard = freeform sections. Salon Landing = structured marketing page with recommended block order.",
+   "fieldname": "page_template",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Page Template",
+   "options": "Standard\nSalon Landing"
+  },
+  {
+   "default": "1",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Published"
+  },
+  {
+   "default": "0",
+   "description": "Use this page's sections to build the website home page",
+   "fieldname": "is_home_page",
+   "fieldtype": "Check",
+   "label": "Is Home Page"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_in_menu",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Show in Menu"
+  },
+  {
+   "description": "Optional override for navigation label",
+   "fieldname": "menu_label",
+   "fieldtype": "Data",
+   "label": "Menu Label"
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "default": "0",
+   "fieldname": "menu_sort_order",
+   "fieldtype": "Int",
+   "label": "Menu Sort Order"
+  },
+  {
+   "fieldname": "meta_description",
+   "fieldtype": "Small Text",
+   "label": "Meta Description"
+  },
+  {
+   "fieldname": "section_break_content",
+   "fieldtype": "Section Break",
+   "label": "Legacy Content"
+  },
+  {
+   "description": "Used when no Hero section is defined in Page Sections",
+   "fieldname": "hero_image",
+   "fieldtype": "Attach Image",
+   "label": "Hero Image"
+  },
+  {
+   "description": "Legacy single-block content. Prefer Page Sections below.",
+   "fieldname": "body",
+   "fieldtype": "Text Editor",
+   "label": "Body"
+  },
+  {
+   "fieldname": "section_break_sections",
+   "fieldtype": "Section Break",
+   "label": "Page Sections"
+  },
+  {
+   "fieldname": "sections",
+   "fieldtype": "Table",
+   "label": "Sections",
+   "options": "Beauty Web Page Section"
+  },
+  {
+   "description": "Images for Gallery sections (match Section Sort Order or Section Name)",
+   "fieldname": "gallery_items",
+   "fieldtype": "Table",
+   "label": "Gallery Items",
+   "options": "Beauty Web Gallery Item"
+  },
+  {
+   "description": "Cards for Why Us sections (match Section Sort Order on each row)",
+   "fieldname": "section_break_why_us",
+   "fieldtype": "Section Break",
+   "label": "Why Us Cards"
+  },
+  {
+   "fieldname": "why_us_items",
+   "fieldtype": "Table",
+   "label": "Why Us Items",
+   "options": "Beauty Web Page Why Us Item"
+  },
+  {
+   "fieldname": "section_break_faq",
+   "fieldtype": "Section Break",
+   "label": "FAQ Items"
+  },
+  {
+   "fieldname": "faq_items",
+   "fieldtype": "Table",
+   "label": "FAQ Items",
+   "options": "Beauty Web Page FAQ Item"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Web Page",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "Beauty Cloud Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "sort_order",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

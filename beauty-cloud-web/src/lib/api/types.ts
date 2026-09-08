@@ -5,6 +5,7 @@ export interface BeautyBranch {
   branch_code: string;
   branch_name: string;
   phone?: string;
+  email?: string;
   address?: string;
 }
 

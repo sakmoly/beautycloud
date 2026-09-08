@@ -1,0 +1,81 @@
+{
+ "actions": [],
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "label",
+  "url",
+  "link_type",
+  "parent_label",
+  "sort_order",
+  "is_visible",
+  "highlight",
+  "open_in_new_tab"
+ ],
+ "fields": [
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label",
+   "reqd": 1
+  },
+  {
+   "description": "e.g. /book, /p/about, /services, or https://…",
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "URL",
+   "reqd": 1
+  },
+  {
+   "default": "Internal",
+   "fieldname": "link_type",
+   "fieldtype": "Select",
+   "label": "Link Type",
+   "options": "Internal\nExternal\nSystem"
+  },
+  {
+   "description": "Group under this dropdown parent (must match another item label)",
+   "fieldname": "parent_label",
+   "fieldtype": "Data",
+   "label": "Parent Menu Label"
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_visible",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Visible"
+  },
+  {
+   "default": "0",
+   "description": "Style as prominent button (e.g. Book Now)",
+   "fieldname": "highlight",
+   "fieldtype": "Check",
+   "label": "Highlight"
+  },
+  {
+   "default": "0",
+   "fieldname": "open_in_new_tab",
+   "fieldtype": "Check",
+   "label": "Open in New Tab"
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Beauty Cloud",
+ "name": "Beauty Web Menu Item",
+ "owner": "Administrator",
+ "permissions": []
+}

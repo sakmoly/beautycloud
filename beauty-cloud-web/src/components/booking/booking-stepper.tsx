@@ -1,72 +1,69 @@
 "use client";
 
-type Step = "services" | "slots" | "otp" | "confirm" | "payment" | "done";
+import type { ReactNode } from "react";
 
-const BASE_STEPS: { id: Step; label: string }[] = [
-  { id: "services", label: "Services" },
-  { id: "slots", label: "Time" },
-  { id: "otp", label: "Verify" },
-  { id: "confirm", label: "Confirm" },
-  { id: "done", label: "Done" },
+export type WizardStep = "services" | "visit" | "slots" | "otp" | "confirm" | "payment" | "done";
+
+const DISPLAY_STEPS: { id: WizardStep; label: string }[] = [
+  { id: "services", label: "Select services" },
+  { id: "visit", label: "Visit details" },
+  { id: "slots", label: "Pick a time" },
+  { id: "otp", label: "Your details" },
 ];
 
-export function BookingStepper({
-  current,
-  requirePayment = false,
-}: {
-  current: Step;
-  requirePayment?: boolean;
-}) {
-  const steps = requirePayment
-    ? [
-        ...BASE_STEPS.slice(0, 4),
-        { id: "payment" as Step, label: "Pay" },
-        BASE_STEPS[4],
-      ]
-    : BASE_STEPS;
+function stepIndex(step: WizardStep): number {
+  if (step === "services") return 0;
+  if (step === "visit") return 1;
+  if (step === "slots") return 2;
+  if (step === "otp" || step === "confirm" || step === "payment" || step === "done") return 3;
+  return 0;
+}
 
-  const currentIndex = steps.findIndex((s) => s.id === current);
+export function getWizardProgress(step: WizardStep) {
+  const index = stepIndex(step);
+  const current = DISPLAY_STEPS[index] ?? DISPLAY_STEPS[0];
+  return {
+    current: index + 1,
+    total: DISPLAY_STEPS.length,
+    label: step === "done" ? "Confirmed" : current.label,
+  };
+}
+
+export function BookingWizardHeader({
+  step,
+  onClose,
+}: {
+  step: WizardStep;
+  onClose?: ReactNode;
+}) {
+  const progress = getWizardProgress(step);
 
   return (
-    <ol className="flex items-center gap-0 overflow-x-auto pb-1">
-      {steps.map((step, index) => {
-        const done = index < currentIndex;
-        const active = index === currentIndex;
+    <header className="bc-wizard-header">
+      <div className="mx-auto flex max-w-7xl items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-white/85">
+            {progress.current} of {progress.total}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{progress.label}</h1>
+        </div>
+        {onClose}
+      </div>
+    </header>
+  );
+}
 
-        return (
-          <li key={step.id} className="flex min-w-0 flex-1 items-center">
-            <div className="flex min-w-0 flex-col items-center gap-1.5">
-              <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition ${
-                  active
-                    ? "bg-[color:var(--bc-primary)] text-white shadow-md shadow-[color:var(--bc-primary)]/30"
-                    : done
-                      ? "bg-[color:var(--bc-primary)]/15 text-[color:var(--bc-primary)]"
-                      : "bg-white text-[color:var(--bc-muted)] ring-1 ring-[color:var(--bc-border)]"
-                }`}
-              >
-                {done ? "✓" : index + 1}
-              </span>
-              <span
-                className={`hidden truncate text-xs font-medium sm:block ${
-                  active ? "text-[color:var(--bc-text)]" : "text-[color:var(--bc-muted)]"
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {index < steps.length - 1 ? (
-              <div
-                className={`mx-1 mb-5 h-0.5 flex-1 rounded-full sm:mx-2 ${
-                  index < currentIndex
-                    ? "bg-[color:var(--bc-primary)]/40"
-                    : "bg-[color:var(--bc-border)]"
-                }`}
-              />
-            ) : null}
-          </li>
-        );
-      })}
-    </ol>
+/** @deprecated Use BookingWizardHeader in wizard shell */
+export function BookingStepper({
+  current,
+}: {
+  current: WizardStep;
+  requirePayment?: boolean;
+}) {
+  const progress = getWizardProgress(current);
+  return (
+    <p className="text-sm text-[color:var(--bc-muted)]">
+      Step {progress.current} of {progress.total} · {progress.label}
+    </p>
   );
 }

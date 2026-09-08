@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter, Playfair_Display } from "next/font/google";
 
 import { InstallAppPrompt } from "@/components/layout/install-app-prompt";
 import { getPublicBootstrap } from "@/lib/frappe/bootstrap";
@@ -8,9 +8,15 @@ import { mergeThemeVariables } from "@/lib/theme/variables";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const bodyFont = Inter({
+  variable: "--font-body",
   subsets: ["latin"],
+});
+
+const displayFont = Playfair_Display({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -46,7 +52,7 @@ export async function generateMetadata(): Promise<Metadata> {
         ],
         apple: [{ url: `${iconPrefix}/icons/apple-touch-icon.png`, sizes: "180x180", type: "image/png" }],
       },
-      themeColor: vars["--bc-primary"] ?? "#2F523F",
+      themeColor: vars["--bc-primary"] ?? "#1A1A1A",
     };
   } catch {
     return {
@@ -62,7 +68,7 @@ export async function generateMetadata(): Promise<Metadata> {
         ],
         apple: [{ url: `${iconPrefix}/icons/apple-touch-icon.png`, sizes: "180x180", type: "image/png" }],
       },
-      themeColor: "#2F523F",
+      themeColor: "#1A1A1A",
     };
   }
 }
@@ -79,7 +85,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${bodyFont.variable} ${displayFont.variable} ${geistMono.variable} h-full antialiased`}
       style={themeStyle}
     >
       <body className="min-h-full flex flex-col font-sans">
