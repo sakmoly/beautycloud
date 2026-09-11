@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   closePosBusinessDay,
   closePosRegisterSession,
+  fetchPosRegisterKey,
   getPosSessionContext,
   openPosBusinessDay,
   openPosRegisterSession,
@@ -15,14 +16,22 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import {
   clearStoredRegister,
+  clearStoredRegisterIfBranchMismatch,
   loadStoredRegister,
   saveStoredRegister,
   type StoredPosRegister,
 } from "@/components/pos/pos-register-store";
+import type { BeautyBranch } from "@/lib/api/types";
 import type { PosSessionContext } from "@/components/pos/pos-session-types";
+import {
+  pickDefaultRegisterCode,
+  validateRegisterCodeForPairing,
+} from "@/components/pos/pos-register-utils";
 
 type Props = {
   branch: string;
+  branches?: BeautyBranch[];
+  onBranchChange?: (branch: string) => void;
   onReadyChange?: (ready: boolean) => void;
 };
 
@@ -45,7 +54,7 @@ function statusTone(status?: string) {
   return "idle";
 }
 
-export function PosSessionScreen({ branch, onReadyChange }: Props) {
+export function PosSessionScreen({ branch, branches = [], onBranchChange, onReadyChange }: Props) {
   const [context, setContext] = useState<PosSessionContext | null>(null);
   const [stored, setStored] = useState<StoredPosRegister | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,8 +62,9 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
-  const [pairCode, setPairCode] = useState("REG-01");
+  const [pairCode, setPairCode] = useState("");
   const [pairKey, setPairKey] = useState("");
+  const [keyVisible, setKeyVisible] = useState(false);
   const [openingFloat, setOpeningFloat] = useState("500");
   const [closingCash, setClosingCash] = useState("");
   const [businessDate, setBusinessDate] = useState("");
@@ -68,7 +78,7 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const reg = loadStoredRegister();
+      const reg = clearStoredRegisterIfBranchMismatch(branch);
       setStored(reg);
       const ctx = (await getPosSessionContext({
         beauty_branch: branch,
@@ -98,7 +108,53 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
     void refresh().catch(() => {});
   }, [refresh]);
 
+  useEffect(() => {
+    const reg = clearStoredRegisterIfBranchMismatch(branch);
+    setStored(reg);
+    setPairCode("");
+    setPairKey("");
+    setKeyVisible(false);
+    setError(null);
+  }, [branch]);
+
+  useEffect(() => {
+    const registers = context?.available_registers ?? [];
+    if (!stored && registers.length > 0) {
+      setPairCode((current) => pickDefaultRegisterCode(registers, current));
+    }
+  }, [context?.available_registers, stored]);
+
+  async function handleFetchKey() {
+    const registerError = validateRegisterCodeForPairing(pairCode);
+    if (registerError) {
+      setError(registerError);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const key = await fetchPosRegisterKey(pairCode.trim());
+      setPairKey(String(key));
+      setKeyVisible(true);
+      setMessage("API key loaded for this register. Tap Pair register to save on this device.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not fetch API key");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handlePair() {
+    const registerError = validateRegisterCodeForPairing(pairCode);
+    if (registerError) {
+      setError(registerError);
+      return;
+    }
+    if (!pairKey.trim()) {
+      setError("Fetch or paste the API key before pairing");
+      return;
+    }
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -266,8 +322,12 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
   const dayOpen = context.business_day?.status === "Open";
   const registerOpen = context.register_session?.status === "Open";
   const canCloseDay =
-    Boolean(context.can_manage_business_day && dayOpen) &&
+    Boolean(context.can_close_business_day && dayOpen) &&
     (!context.require_all_registers_closed || (context.open_registers?.length ?? 0) === 0);
+
+  function scrollToBusinessDay() {
+    document.getElementById("pos-business-day-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <div className="pos-session-screen">
@@ -276,7 +336,8 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
           <p className="text-sm font-medium text-[color:var(--bc-muted)]">Checkout desk</p>
           <h2 className="text-2xl font-bold tracking-tight">Register &amp; business day</h2>
           <p className="bc-section-sub">
-            Open and close sessions here — synced with Beauty Business Day and Beauty Register Session
+            Each store opens its own business day. The button below applies to{" "}
+            <strong>{context.branch_name ?? branch}</strong> only — not all stores at once.
           </p>
         </div>
         <Button type="button" variant="secondary" onClick={() => void refresh()} disabled={busy}>
@@ -284,16 +345,37 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
         </Button>
       </div>
 
+      {branches.length > 1 && onBranchChange ? (
+        <div className="max-w-md">
+          <Label htmlFor="session-branch">Store / branch</Label>
+          <select
+            id="session-branch"
+            className="mt-1.5 min-h-11 w-full rounded-xl border border-[color:var(--bc-border)] bg-white px-3 text-sm"
+            value={branch}
+            onChange={(e) => onBranchChange(e.target.value)}
+          >
+            {branches.map((b) => (
+              <option key={b.name} value={b.name}>
+                {b.branch_name ?? b.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-[color:var(--bc-muted)]">
+            Switch branch to open that store&apos;s business day separately.
+          </p>
+        </div>
+      ) : null}
+
       {message ? <div className="pos-session-banner pos-session-banner--success">{message}</div> : null}
       {error ? <div className="pos-session-banner pos-session-banner--error">{error}</div> : null}
 
       <div className="pos-session-grid">
         {/* Business Day */}
-        <section className="pos-session-card">
+        <section className="pos-session-card" id="pos-business-day-card">
           <header className="pos-session-card__header">
             <div>
               <p className="pos-session-card__eyebrow">Beauty Business Day</p>
-              <h3>Business day</h3>
+              <h3>{context.branch_name ?? branch}</h3>
             </div>
             <span className={`pos-session-pill pos-session-pill--${statusTone(context.business_day?.status)}`}>
               {context.business_day?.status ?? "Not open"}
@@ -326,31 +408,36 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
             </dl>
           ) : (
             <p className="pos-session-muted">
-              No open business day for this branch.
+              No open business day for <strong>{context.branch_name ?? branch}</strong>.
               {context.suggested_business_date
                 ? ` Suggested date: ${context.suggested_business_date}.`
-                : ""}
+                : ""}{" "}
+              Other stores must open their own day from their POS or by switching branch above.
             </p>
           )}
 
-          {context.can_manage_business_day ? (
+          {context.can_open_business_day || context.can_close_business_day ? (
             <div className="pos-session-card__actions">
               {!dayOpen ? (
-                <div className="pos-session-form">
-                  <Label htmlFor="business-date">Business date</Label>
-                  <Input
-                    id="business-date"
-                    type="date"
-                    value={businessDate}
-                    onChange={(e) => setBusinessDate(e.target.value)}
-                  />
-                  <Label htmlFor="day-notes">Notes (optional)</Label>
-                  <Input id="day-notes" value={dayNotes} onChange={(e) => setDayNotes(e.target.value)} />
-                  <Button type="button" disabled={busy} onClick={() => void handleOpenDay()}>
-                    Open business day
-                  </Button>
-                </div>
-              ) : (
+                context.can_open_business_day ? (
+                  <div className="pos-session-form">
+                    <Label htmlFor="business-date">Business date</Label>
+                    <Input
+                      id="business-date"
+                      type="date"
+                      value={businessDate}
+                      onChange={(e) => setBusinessDate(e.target.value)}
+                    />
+                    <Label htmlFor="day-notes">Notes (optional)</Label>
+                    <Input id="day-notes" value={dayNotes} onChange={(e) => setDayNotes(e.target.value)} />
+                    <Button type="button" disabled={busy} onClick={() => void handleOpenDay()}>
+                      Open business day
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="pos-session-muted">Ask a branch manager to open the business day.</p>
+                )
+              ) : context.can_close_business_day ? (
                 <div className="pos-session-form">
                   {(context.open_registers?.length ?? 0) > 0 ? (
                     <p className="pos-session-warn">
@@ -373,10 +460,14 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
                     Close business day
                   </Button>
                 </div>
+              ) : (
+                <p className="pos-session-muted">
+                  Business day is open. Only a branch manager can close it at end of day.
+                </p>
               )}
             </div>
           ) : (
-            <p className="pos-session-muted">Only a branch manager can open or close the business day.</p>
+            <p className="pos-session-muted">Ask a branch manager to open the business day.</p>
           )}
         </section>
 
@@ -395,18 +486,71 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
           {!stored ? (
             <div className="pos-session-form">
               <p className="pos-session-muted">
-                Pair this tablet with a register. Get the API key from Desk → Beauty POS Register → Pairing.
+                Pair this tablet with a register for <strong>{context.beauty_branch}</strong>. Only
+                registers for this branch are listed. Store staff see their branch only.
               </p>
-              <Label htmlFor="pair-code">Register code</Label>
-              <Input id="pair-code" value={pairCode} onChange={(e) => setPairCode(e.target.value)} />
+              <Label htmlFor="pair-code">Register</Label>
+              {(context.available_registers?.length ?? 0) > 0 ? (
+                <select
+                  id="pair-code"
+                  className="min-h-11 w-full rounded-xl border border-[color:var(--bc-border)] bg-white px-3 text-sm"
+                  value={pickDefaultRegisterCode(context.available_registers ?? [], pairCode)}
+                  onChange={(e) => {
+                    setPairCode(e.target.value);
+                    setPairKey("");
+                    setKeyVisible(false);
+                    setError(null);
+                  }}
+                >
+                  {context.available_registers?.map((row) => {
+                    const code = row.register_code ?? row.name ?? "";
+                    return (
+                      <option key={code} value={code}>
+                        {code}
+                        {row.register_name ? ` · ${row.register_name}` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <>
+                  <Input
+                    id="pair-code"
+                    value={pairCode}
+                    placeholder="e.g. REG-02"
+                    onChange={(e) => setPairCode(e.target.value)}
+                  />
+                  <p className="pos-session-muted text-xs">
+                    No register is set up for this branch yet. Create one in Desk → Beauty POS Register.
+                  </p>
+                </>
+              )}
               <Label htmlFor="pair-key">API key</Label>
-              <Input
-                id="pair-key"
-                type="password"
-                value={pairKey}
-                onChange={(e) => setPairKey(e.target.value)}
-              />
-              <Button type="button" disabled={busy} onClick={() => void handlePair()}>
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <Input
+                  id="pair-key"
+                  type={keyVisible ? "text" : "password"}
+                  value={pairKey}
+                  onChange={(e) => setPairKey(e.target.value)}
+                  placeholder="Fetch key or paste from Desk"
+                />
+                {context.can_fetch_pairing_key ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={busy || !pairCode.trim()}
+                    onClick={() => void handleFetchKey()}
+                  >
+                    Fetch key
+                  </Button>
+                ) : null}
+              </div>
+              {!context.can_fetch_pairing_key ? (
+                <p className="pos-session-muted text-xs">
+                  Ask a branch manager to copy the key from Desk → Beauty POS Register → Pairing.
+                </p>
+              ) : null}
+              <Button type="button" disabled={busy || !pairCode.trim() || !pairKey.trim()} onClick={() => void handlePair()}>
                 Pair register
               </Button>
             </div>
@@ -460,7 +604,20 @@ export function PosSessionScreen({ branch, onReadyChange }: Props) {
 
               <div className="pos-session-card__actions">
                 {!dayOpen ? (
-                  <p className="pos-session-warn">Open a business day before opening this register.</p>
+                  <div className="pos-session-form">
+                    <p className="pos-session-warn">
+                      Step 1: Open the business day first, then you can open this register.
+                    </p>
+                    {context.can_open_business_day ? (
+                      <Button type="button" variant="secondary" onClick={scrollToBusinessDay}>
+                        Open business day
+                      </Button>
+                    ) : (
+                      <p className="pos-session-muted text-sm">
+                        Ask your branch manager to open the business day for this branch.
+                      </p>
+                    )}
+                  </div>
                 ) : !registerOpen ? (
                   <div className="pos-session-form">
                     <Label htmlFor="opening-float">Opening float</Label>

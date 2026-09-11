@@ -6,7 +6,7 @@ export type WizardStep = "services" | "visit" | "slots" | "otp" | "confirm" | "p
 
 const DISPLAY_STEPS: { id: WizardStep; label: string }[] = [
   { id: "services", label: "Select services" },
-  { id: "visit", label: "Visit details" },
+  { id: "visit", label: "Choose branch" },
   { id: "slots", label: "Pick a time" },
   { id: "otp", label: "Your details" },
 ];

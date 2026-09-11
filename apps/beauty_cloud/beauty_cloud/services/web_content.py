@@ -132,7 +132,28 @@ def _header_menu_items(company: str | None, branch: str | None) -> list[dict]:
 			}
 		)
 
-	return items
+	return _inject_home_nav_item(items)
+
+
+def _inject_home_nav_item(items: list[dict]) -> list[dict]:
+	"""Ensure a Home link is always available in the header menu."""
+	home_urls = {"/", "/home", ""}
+	has_home = any((item.get("url") or "").strip().rstrip("/") in home_urls for item in items)
+	if has_home:
+		return items
+	return [
+		{
+			"label": "Home",
+			"url": "/",
+			"link_type": "System",
+			"parent_label": None,
+			"sort_order": 0,
+			"highlight": False,
+			"open_in_new_tab": False,
+			"source": "system",
+		},
+		*items,
+	]
 
 
 def _build_nav_from_menu_items(items: list[dict]) -> list[dict]:
@@ -615,6 +636,7 @@ def ensure_default_menu(company: str):
 		return
 
 	default_items = [
+		{"label": "Home", "url": "/", "link_type": "System", "sort_order": 5, "is_visible": 1},
 		{"label": "Store", "url": "/services", "link_type": "System", "sort_order": 10, "is_visible": 1},
 		{
 			"label": "Our Services",
@@ -665,6 +687,33 @@ def ensure_default_menu(company: str):
 	]
 	for item in default_items:
 		doc.append("menu_items", item)
+	doc.save(ignore_permissions=True)
+
+
+def ensure_home_menu_item(company: str):
+	"""Add Home to branding menu when missing (existing sites)."""
+	docname = frappe.db.get_value(
+		"Beauty Cloud Branding Settings",
+		{"company": company, "branch": ("is", "not set"), "enabled": 1},
+	)
+	if not docname:
+		return
+	doc = frappe.get_doc("Beauty Cloud Branding Settings", docname)
+	home_urls = {"/", "/home"}
+	if any((row.url or "").strip() in home_urls for row in doc.get("menu_items") or []):
+		return
+	if any((row.label or "").strip().lower() == "home" for row in doc.get("menu_items") or []):
+		return
+	doc.append(
+		"menu_items",
+		{
+			"label": "Home",
+			"url": "/",
+			"link_type": "System",
+			"sort_order": 5,
+			"is_visible": 1,
+		},
+	)
 	doc.save(ignore_permissions=True)
 
 

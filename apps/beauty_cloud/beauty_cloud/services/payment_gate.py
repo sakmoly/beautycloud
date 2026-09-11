@@ -11,16 +11,41 @@ PAID_STATUSES = ("Paid", "Deposit Paid")
 
 
 def get_salon_payment_settings() -> dict:
+	from beauty_cloud.services.check_in_qr import get_check_in_settings
+
 	settings = frappe.get_single("Beauty Cloud Settings")
+	check_in = get_check_in_settings()
 	return {
 		"require_payment_before_service": bool(getattr(settings, "require_payment_before_service", 0)),
 		"require_payment_at_kiosk": bool(getattr(settings, "require_payment_at_kiosk", 0)),
-		"require_qr_for_check_in": bool(getattr(settings, "require_qr_for_check_in", 0)),
+		"require_payment_for_check_in": bool(getattr(settings, "require_payment_for_check_in", 1)),
+		"require_qr_for_check_in": check_in["require_qr_for_check_in"],
+		"require_id_for_check_in": check_in["require_id_for_check_in"],
+		"require_check_in_before_service": bool(getattr(settings, "require_check_in_before_service", 1)),
+		"require_invoice_before_service": bool(getattr(settings, "require_invoice_before_service", 1)),
 	}
 
 
 def is_appointment_paid(payment_status: str | None) -> bool:
 	return (payment_status or "Unpaid") in PAID_STATUSES
+
+
+def assert_payment_for_check_in(appointment_name: str) -> None:
+	settings = get_salon_payment_settings()
+	if not settings["require_payment_for_check_in"]:
+		return
+
+	appt = frappe.get_doc("Beauty Appointment", appointment_name)
+	if is_appointment_paid(appt.payment_status):
+		return
+
+	frappe.throw(
+		_(
+			"Payment must be collected before check-in for {0}. "
+			"Open the appointment in POS to take payment first."
+		).format(appointment_name),
+		title=_("Payment Required"),
+	)
 
 
 def assert_payment_before_service(appointment_name: str) -> None:
@@ -46,12 +71,14 @@ def collect_appointment_payment(
 	mode_of_payment: str = "Cash",
 	amount: float | None = None,
 	source: str = "Reception",
+	skip_permission_check: bool = False,
 ) -> dict:
 	"""Post POS payment for an appointment's services."""
 	from beauty_cloud.services.pos import checkout
 
 	appt = frappe.get_doc("Beauty Appointment", appointment_name)
-	appt.check_permission("write")
+	if not skip_permission_check:
+		appt.check_permission("write")
 
 	if is_appointment_paid(appt.payment_status):
 		frappe.throw(_("Appointment {0} is already paid").format(appointment_name))

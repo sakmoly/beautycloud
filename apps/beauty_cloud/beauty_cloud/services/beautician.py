@@ -105,6 +105,15 @@ def get_my_schedule(
 		as_dict=True,
 	)
 
+	from beauty_cloud.services.invoice_gate import get_appointment_invoice_info
+
+	appointment_names = sorted({row.appointment for row in lines if row.appointment})
+	invoice_by_appointment = {
+		name: get_appointment_invoice_info(name)["has_invoice"] for name in appointment_names
+	}
+	for row in lines:
+		row["has_invoice"] = invoice_by_appointment.get(row.appointment, False)
+
 	today_lines = [row for row in lines if getdate(row.appointment_date) == getdate(today())]
 	upcoming = [row for row in lines if getdate(row.appointment_date) > getdate(today())]
 

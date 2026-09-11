@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
-import {
-  getBranches,
-  getReceptionCalendar,
-} from "@/lib/api/browser-client";
+import { BranchField } from "@/components/staff/branch-field";
+import { getReceptionCalendar } from "@/lib/api/browser-client";
+import { useStaffBranch } from "@/lib/use-staff-branch";
 import type { CalendarEvent, CalendarContext } from "@/lib/api/types";
 import {
   inactiveAppointmentLabel,
@@ -670,10 +669,9 @@ function MonthView({
 }
 
 export function ReceptionCalendarView() {
+  const { branch, setBranch, branches, branchLocked, branchLabel, ready } = useStaffBranch();
   const [view, setView] = useState<CalendarView>("day");
   const [anchor, setAnchor] = useState(formatIsoDate(new Date()));
-  const [branch, setBranch] = useState("");
-  const [branches, setBranches] = useState<Array<{ name: string; branch_name: string }>>([]);
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [employees, setEmployees] = useState<Array<{ name: string; employee_name: string }>>([]);
@@ -708,17 +706,9 @@ export function ReceptionCalendarView() {
   }
 
   useEffect(() => {
-    getBranches()
-      .then((rows) => {
-        setBranches(rows);
-        if (rows[0]?.name) setBranch(rows[0].name);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
+    if (!ready || !branch) return;
     load();
-  }, [branch, view, anchor, employeeFilter, range.start, range.end]);
+  }, [branch, view, anchor, employeeFilter, range.start, range.end, ready]);
 
   const scopeLabel =
     context?.scope === "own"
@@ -818,21 +808,14 @@ export function ReceptionCalendarView() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3 border-t border-[color:var(--bc-border)] pt-4">
-            <div className="min-w-[160px] flex-1">
-              <Label htmlFor="branch">Branch</Label>
-              <select
-                id="branch"
-                className="mt-1 min-h-11 w-full rounded-xl border border-[color:var(--bc-border)] bg-white px-3 shadow-sm"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-              >
-                {branches.map((b) => (
-                  <option key={b.name} value={b.name}>
-                    {b.branch_name ?? b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <BranchField
+              className="min-w-[160px] flex-1"
+              branch={branch}
+              branches={branches}
+              branchLocked={branchLocked}
+              branchLabel={branchLabel}
+              onChange={setBranch}
+            />
 
             {context?.can_filter_employee ? (
               <div className="min-w-[160px] flex-1">
@@ -941,7 +924,6 @@ export function ReceptionCalendarView() {
             event={selectedEvent}
             variant="modal"
             beautyBranch={branch}
-            employees={employees}
             onClose={closeModal}
             onUpdated={handleUpdated}
           />

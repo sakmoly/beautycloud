@@ -4,12 +4,14 @@ import type { PublicBootstrap } from "@/lib/frappe/types";
 export async function getPublicBootstrap(
   company?: string,
   branch?: string,
+  sid?: string,
 ): Promise<PublicBootstrap> {
   return frappeCall<PublicBootstrap>(
     "beauty_cloud.api.bootstrap.get_public_bootstrap",
     {
       params: { company, branch },
       cache: "no-store",
+      sid,
     },
   );
 }

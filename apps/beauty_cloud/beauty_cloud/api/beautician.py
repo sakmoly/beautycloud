@@ -105,6 +105,8 @@ def get_commission_preview(appointment_name: str, service_row: int):
 
 @frappe.whitelist()
 def get_me():
+	from beauty_cloud.workflow_permissions import get_workflow_capabilities
+
 	employee = get_current_employee(allow_none=True)
 	can_select = _can_view_all_schedules()
 	result = {
@@ -113,6 +115,7 @@ def get_me():
 		"user": frappe.session.user,
 		"roles": frappe.get_roles(),
 		"can_select_employee": can_select and not employee,
+		"workflow": get_workflow_capabilities(),
 	}
 	if can_select and not employee:
 		result["employees"] = frappe.get_all(

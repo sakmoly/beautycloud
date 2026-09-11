@@ -16,14 +16,26 @@ def get_session_dashboard(
 	register_code: str | None = None,
 	api_key: str | None = None,
 ) -> dict:
+	from beauty_cloud.services.user_branch import assert_branch_access, can_fetch_register_pairing_key
+
+	assert_branch_access(beauty_branch)
 	branch = frappe.get_doc("Beauty Branch", beauty_branch)
 	business_day = get_open_business_day(beauty_branch)
 	register = None
 	register_session = None
+	register_pairing_error = None
 
-	if register_code and api_key:
-		register = _authenticate_register(register_code, api_key, beauty_branch)
-		register_session = get_open_register_session(register.name)
+	if register_code:
+		if not api_key:
+			register_pairing_error = _("Register is paired but missing credentials — re-pair in Register & Day")
+		else:
+			try:
+				register = _authenticate_register(register_code, api_key, beauty_branch)
+				register_session = get_open_register_session(register.name)
+			except frappe.AuthenticationError as exc:
+				register_pairing_error = str(exc)
+			except frappe.ValidationError as exc:
+				register_pairing_error = str(exc)
 
 	open_day_name = business_day.name if business_day else None
 	my_session_summary = None
@@ -32,7 +44,10 @@ def get_session_dashboard(
 
 	return {
 		"beauty_branch": beauty_branch,
-		"can_manage_business_day": _can_manage_business_day(),
+		"branch_name": branch.branch_name,
+		"can_manage_business_day": _can_close_business_day(),
+		"can_open_business_day": _can_open_business_day(),
+		"can_close_business_day": _can_close_business_day(),
 		"can_unpair_register": _can_unpair_register(),
 		"enforce_business_day": bool(branch.get("require_business_day_for_pos")),
 		"enforce_register_session": bool(branch.get("require_register_session_for_pos")),
@@ -41,11 +56,13 @@ def get_session_dashboard(
 		"business_day": _business_day_summary(business_day, full=True),
 		"suggested_business_date": suggest_business_date(beauty_branch),
 		"register": _register_summary(register) if register else None,
+		"register_pairing_error": register_pairing_error,
 		"register_session": my_session_summary,
 		"open_registers": _register_sessions_for_day(beauty_branch, open_day_name, status="Open"),
 		"closed_registers": _register_sessions_for_day(beauty_branch, open_day_name, status="Closed"),
 		"recent_business_days": _recent_business_days(beauty_branch),
 		"available_registers": list_registers(beauty_branch),
+		"can_fetch_pairing_key": can_fetch_register_pairing_key(),
 	}
 
 
@@ -71,9 +88,11 @@ def get_open_business_day(beauty_branch: str):
 
 
 def open_business_day(beauty_branch: str, business_date: str | None = None, notes: str | None = None) -> dict:
+	from beauty_cloud.services.user_branch import assert_branch_access
+
+	assert_branch_access(beauty_branch)
+	_assert_can_open_business_day()
 	branch = frappe.get_doc("Beauty Branch", beauty_branch)
-	branch.check_permission("write")
-	_assert_can_manage_business_day()
 
 	open_day = get_open_business_day(beauty_branch)
 	if open_day:
@@ -105,7 +124,7 @@ def open_business_day(beauty_branch: str, business_date: str | None = None, note
 
 
 def close_business_day(beauty_branch: str | None = None, name: str | None = None, notes: str | None = None) -> dict:
-	_assert_can_manage_business_day()
+	_assert_can_close_business_day()
 	doc = _resolve_business_day(beauty_branch, name)
 	if doc.status != "Open":
 		frappe.throw(_("Business day {0} is not open").format(doc.name))
@@ -150,7 +169,7 @@ def close_business_day(beauty_branch: str | None = None, name: str | None = None
 
 
 def mark_business_day_posted(name: str) -> dict:
-	_assert_can_manage_business_day()
+	_assert_can_close_business_day()
 	doc = frappe.get_doc("Beauty Business Day", name)
 	if doc.status != "Closed":
 		frappe.throw(_("Only closed business days can be marked posted"))
@@ -206,10 +225,12 @@ def open_register_session(
 
 	existing = get_open_register_session(register.name)
 	if existing:
-		if existing.cashier == frappe.session.user:
+		if _can_use_register_session(register, existing):
 			return _register_session_summary(existing, include_live_totals=True)
 		frappe.throw(
-			_("Register {0} is already open in session {1}").format(register.register_code, existing.name)
+			_("Register {0} is already open in session {1} by {2}").format(
+				register.register_code, existing.name, existing.cashier
+			)
 		)
 
 	doc = frappe.get_doc(
@@ -240,7 +261,7 @@ def close_register_session(
 	doc = frappe.get_doc("Beauty Register Session", session_name)
 	if doc.status != "Open":
 		frappe.throw(_("Register session {0} is not open").format(doc.name))
-	if doc.cashier != frappe.session.user and not _can_manage_business_day():
+	if doc.cashier != frappe.session.user and not _can_close_business_day():
 		frappe.throw(_("Only the opening cashier or a manager can close this register session"))
 
 	expected_cash, total_sales, tx_count = _register_session_totals(doc.name, doc.opening_float)
@@ -283,6 +304,22 @@ def resolve_checkout_session(cart: dict) -> dict:
 	register = None
 	posting_date = getdate(today())
 
+	# Kiosk self-service: business day when required, but no open register session.
+	if cart.get("source") == "Kiosk":
+		if enforce_day:
+			business_day = get_open_business_day(branch.name)
+			if not business_day:
+				frappe.throw(_("Open a business day before kiosk checkout"))
+			posting_date = getdate(business_day.business_date)
+		return {
+			"beauty_business_day": business_day.name if business_day else None,
+			"business_date": posting_date,
+			"beauty_register_session": None,
+			"beauty_pos_register": None,
+			"register_code": None,
+			"cashier": cart.get("cashier") or "Administrator",
+		}
+
 	if enforce_day or enforce_register or cart.get("register_code"):
 		business_day = get_open_business_day(branch.name)
 		if enforce_day and not business_day:
@@ -297,8 +334,12 @@ def resolve_checkout_session(cart: dict) -> dict:
 		register_session = get_open_register_session(register.name)
 		if not register_session:
 			frappe.throw(_("Open register session for {0} before checkout").format(register.register_code))
-		if register_session.cashier != frappe.session.user:
-			frappe.throw(_("Register {0} is open under another cashier").format(register.register_code))
+		if not _can_use_register_session(register, register_session):
+			frappe.throw(
+				_(
+					"Register {0} is open under {1}. Only that cashier or another staff member at this branch can checkout."
+				).format(register.register_code, register_session.cashier)
+			)
 
 	if business_day:
 		posting_date = getdate(business_day.business_date)
@@ -369,7 +410,54 @@ def _resolve_business_day(beauty_branch: str | None, name: str | None):
 	return doc
 
 
-def _can_manage_business_day() -> bool:
+def _can_checkout_on_branch_register(beauty_branch: str) -> bool:
+	"""Branch POS staff may issue sales on an already-open store register."""
+	if frappe.session.user == "Administrator":
+		return True
+
+	from beauty_cloud.services.user_branch import assert_branch_access
+
+	try:
+		assert_branch_access(beauty_branch)
+	except frappe.PermissionError:
+		return False
+
+	roles = set(frappe.get_roles())
+	return bool(
+		roles.intersection(
+			{
+				"System Manager",
+				"Beauty Cloud Branch Manager",
+				"Beauty Cloud Cashier",
+				"Beauty Cloud Receptionist",
+			}
+		)
+	)
+
+
+def _can_use_register_session(register, register_session) -> bool:
+	if register_session.cashier == frappe.session.user:
+		return True
+	return _can_checkout_on_branch_register(register.beauty_branch)
+
+
+def _can_open_business_day() -> bool:
+	if frappe.session.user == "Administrator":
+		return True
+	roles = set(frappe.get_roles())
+	return bool(
+		roles.intersection(
+			{
+				"System Manager",
+				"Beauty Cloud Branch Manager",
+				"Beauty Cloud Cashier",
+				"Beauty Cloud Receptionist",
+			}
+		)
+	)
+
+
+def _can_close_business_day() -> bool:
 	return _has_register_manager_role()
 
 
@@ -384,9 +472,14 @@ def _has_register_manager_role() -> bool:
 	return bool({"System Manager", "Beauty Cloud Branch Manager"} & roles)
 
 
-def _assert_can_manage_business_day():
-	if not _can_manage_business_day():
-		frappe.throw(_("Only a branch manager can open or close business days"))
+def _assert_can_open_business_day():
+	if not _can_open_business_day():
+		frappe.throw(_("You do not have permission to open a business day"))
+
+
+def _assert_can_close_business_day():
+	if not _can_close_business_day():
+		frappe.throw(_("Only a branch manager can close business days"))
 
 
 def _assert_can_unpair_register():

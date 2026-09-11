@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, time as dt_time
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime, getdate, get_time, get_url, time_diff_in_seconds
+from frappe.utils import flt, get_datetime, getdate, get_time, get_url, now_datetime, time_diff_in_seconds
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 ACTIVE_APPOINTMENT_STATUSES = (
@@ -28,6 +28,7 @@ def get_available_slots(
 	employee: str | None = None,
 	service_location: str = "Salon",
 	slot_interval: int | None = None,
+	booking_channel: str = "online",
 ) -> list[dict]:
 	"""Return valid booking slots for one or more services."""
 	service_codes = _parse_services(services)
@@ -35,12 +36,21 @@ def get_available_slots(
 		frappe.throw(_("At least one service is required"))
 
 	appointment_date = getdate(appointment_date)
+	if appointment_date < getdate(now_datetime()):
+		return []
+
 	weekday = WEEKDAYS[appointment_date.weekday()]
 	company = frappe.db.get_value("Beauty Branch", beauty_branch, "company")
-	_validate_services_for_booking(service_codes, company, service_location)
+	_validate_services_for_booking(service_codes, company, service_location, booking_channel)
 
 	duration_meta = _get_duration_meta(service_codes)
 	slot_interval = slot_interval or _get_slot_interval(beauty_branch)
+	earliest_bookable = _get_earliest_bookable_start(appointment_date, slot_interval)
+	from beauty_cloud.services.hr_schedule import is_branch_holiday
+
+	if is_branch_holiday(beauty_branch, appointment_date, company):
+		return []
+
 	branch_window = _get_branch_window(beauty_branch, weekday, appointment_date)
 	if not branch_window:
 		return []
@@ -57,6 +67,8 @@ def get_available_slots(
 			continue
 
 		cursor = emp_window["start"]
+		if earliest_bookable:
+			cursor = max(cursor, earliest_bookable)
 		slot_duration = timedelta(minutes=duration_meta["total_minutes"])
 		while cursor + slot_duration <= emp_window["end"]:
 			slot_end = cursor + slot_duration
@@ -89,21 +101,38 @@ def validate_slot(
 	start_time: str | datetime,
 	employee: str,
 	service_location: str = "Salon",
+	booking_channel: str = "online",
 ) -> dict:
 	"""Revalidate a slot at booking confirmation time."""
 	start_dt = get_datetime(start_time)
+	appointment_day = getdate(appointment_date)
+	if appointment_day < getdate(now_datetime()):
+		frappe.throw(_("Cannot book appointments in the past"))
+
 	service_codes = _parse_services(services)
 	duration_meta = _get_duration_meta(service_codes)
 	end_dt = start_dt + timedelta(minutes=duration_meta["total_minutes"])
-	weekday = WEEKDAYS[getdate(appointment_date).weekday()]
+	weekday = WEEKDAYS[appointment_day.weekday()]
 	company = frappe.db.get_value("Beauty Branch", beauty_branch, "company")
 
-	_validate_services_for_booking(service_codes, company, service_location)
-	branch_window = _get_branch_window(beauty_branch, weekday, getdate(appointment_date))
+	_validate_services_for_booking(service_codes, company, service_location, booking_channel)
+	slot_interval = _get_slot_interval(beauty_branch)
+	earliest_bookable = _get_earliest_bookable_start(appointment_day, slot_interval)
+	if earliest_bookable and start_dt < earliest_bookable:
+		frappe.throw(_("Selected time is in the past"))
+	from beauty_cloud.services.hr_schedule import is_branch_holiday, is_employee_on_leave
+
+	if is_branch_holiday(beauty_branch, appointment_day, company):
+		frappe.throw(_("Branch is closed on this date"))
+
+	branch_window = _get_branch_window(beauty_branch, weekday, appointment_day)
 	if not branch_window:
 		frappe.throw(_("Branch is closed on {0}").format(weekday))
 
-	emp_window = _get_employee_window(employee, beauty_branch, weekday, getdate(appointment_date), branch_window)
+	if is_employee_on_leave(employee, appointment_day):
+		frappe.throw(_("Selected beautician is on leave on this date"))
+
+	emp_window = _get_employee_window(employee, beauty_branch, weekday, appointment_day, branch_window)
 	if not emp_window or start_dt < emp_window["start"] or end_dt > emp_window["end"]:
 		frappe.throw(_("Selected time is outside working hours"))
 
@@ -188,26 +217,54 @@ def _get_slot_interval(beauty_branch: str) -> int:
 	return int(branch_interval or settings.default_slot_interval_minutes or 15)
 
 
-def _validate_services_for_booking(service_codes: list[str], company: str, service_location: str):
+def _ceil_datetime_to_interval(dt: datetime, interval_minutes: int) -> datetime:
+	"""Round up to the next slot boundary (e.g. 11:40 → 11:45 when interval is 15)."""
+	dt = get_datetime(dt).replace(second=0, microsecond=0)
+	remainder = dt.minute % interval_minutes
+	if remainder:
+		dt += timedelta(minutes=interval_minutes - remainder)
+	return dt
+
+
+def _get_earliest_bookable_start(appointment_date, slot_interval: int) -> datetime | None:
+	"""For today, return the first bookable slot start; for other dates, no floor."""
+	appointment_date = getdate(appointment_date)
+	today = getdate(now_datetime())
+	if appointment_date < today:
+		return None
+	if appointment_date > today:
+		return None
+	return _ceil_datetime_to_interval(now_datetime(), slot_interval)
+
+
+def _validate_services_for_booking(
+	service_codes: list[str],
+	company: str,
+	service_location: str,
+	booking_channel: str = "online",
+):
 	location_field = {
 		"Salon": "allow_salon",
 		"Home": "allow_home",
 		"Hotel": "allow_hotel",
 	}.get(service_location, "allow_salon")
-
 	for code in service_codes:
 		service = frappe.db.get_value(
 			"Beauty Service",
 			code,
-			["name", "company", "is_active", "online_booking_enabled", location_field],
+			["name", "company", "is_active", "online_booking_enabled", "kiosk_enabled", location_field],
 			as_dict=True,
 		)
 		if not service or not service.is_active:
 			frappe.throw(_("Service {0} is not available").format(code))
 		if service.company != company:
 			frappe.throw(_("Service {0} does not belong to this branch company").format(code))
-		if not service.online_booking_enabled:
-			frappe.throw(_("Service {0} is not enabled for online booking").format(code))
+		if booking_channel == "kiosk":
+			if not service.kiosk_enabled:
+				frappe.throw(_("Service {0} is not enabled for kiosk").format(code))
+		elif booking_channel == "online":
+			if not service.online_booking_enabled:
+				frappe.throw(_("Service {0} is not enabled for online booking").format(code))
 		if not service.get(location_field):
 			frappe.throw(_("Service {0} is not available for {1}").format(code, service_location))
 
@@ -271,26 +328,15 @@ def _get_employee_window(
 	appointment_date,
 	branch_window: dict,
 ) -> dict | None:
-	rows = frappe.get_all(
-		"Beauty Employee Schedule",
-		filters={
-			"employee": employee,
-			"beauty_branch": beauty_branch,
-			"weekday": weekday,
-			"is_active": 1,
-		},
-		fields=["start_time", "end_time"],
-	)
-	if not rows:
-		return branch_window
+	from beauty_cloud.services.hr_schedule import resolve_employee_window
 
-	start = _combine_datetime(appointment_date, rows[0].start_time)
-	end = _combine_datetime(appointment_date, rows[0].end_time)
-	start = max(start, branch_window["start"])
-	end = min(end, branch_window["end"])
-	if time_diff_in_seconds(end, start) <= 0:
-		return None
-	return {"start": start, "end": end}
+	return resolve_employee_window(
+		employee,
+		beauty_branch,
+		weekday,
+		appointment_date,
+		branch_window,
+	)
 
 
 def _get_candidate_employees(
@@ -310,8 +356,12 @@ def _get_candidate_employees(
 		fields=["employee"],
 		pluck="employee",
 	)
+	from beauty_cloud.services.hr_schedule import is_employee_active_for_booking
+
 	qualified = []
 	for emp in set(employees):
+		if not is_employee_active_for_booking(emp):
+			continue
 		if _employee_can_perform_services(emp, service_codes, company, beauty_branch):
 			qualified.append(emp)
 	return qualified

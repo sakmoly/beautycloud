@@ -4,29 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { InstallAppButton } from "@/components/layout/install-app-prompt";
+import type { StaffWorkflowCapabilities } from "@/lib/frappe/types";
 import { withBasePath } from "@/lib/base-path";
+import { staffNavItems } from "@/lib/staff-nav";
 
-const NAV = [
-  { href: "/staff/reception", label: "Reception", icon: "🏠" },
-  { href: "/staff/reception/calendar", label: "Calendar", icon: "📅" },
-  { href: "/staff/reception/queue", label: "Queue", icon: "👥" },
-  { href: "/staff/beautician", label: "Beautician", icon: "✨" },
-  { href: "/staff/inventory", label: "Inventory", icon: "📦" },
-  { href: "/staff/pos", label: "POS", icon: "💳" },
-  { href: "/staff/commission", label: "Commission", icon: "💰" },
-  { href: "/staff/loyalty", label: "Loyalty", icon: "🎁" },
-  { href: "/staff/reports", label: "Reports", icon: "📊" },
-  { href: "/staff/admin", label: "Admin", icon: "⚙️" },
-];
-
-const COMPACT_NAV = [
-  { href: "/staff/pos", label: "POS", icon: "💳" },
-  { href: "/staff/reception/queue", label: "Queue", icon: "👥" },
-];
-
-export function StaffNav({ compact = false }: { compact?: boolean }) {
+export function StaffNav({
+  compact = false,
+  workflow,
+}: {
+  compact?: boolean;
+  workflow?: StaffWorkflowCapabilities;
+}) {
   const pathname = usePathname();
-  const items = compact ? COMPACT_NAV : NAV;
+  const items = staffNavItems(workflow, compact);
 
   return (
     <nav className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

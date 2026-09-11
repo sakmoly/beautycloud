@@ -32,9 +32,32 @@ function resolveNavHref(url: string) {
   return withBasePath(url.startsWith("/") ? url : `/${url}`);
 }
 
-function NavLink({ item }: { item: WebNavItem }) {
+function normalizePath(path: string) {
+  const trimmed = path.replace(/\/$/, "");
+  return trimmed || "/";
+}
+
+function isNavActive(pathname: string, url: string) {
+  const href = resolveNavHref(url);
+  const current = normalizePath(pathname);
+  const target = normalizePath(href);
+  const homePath = normalizePath(withBasePath("/"));
+
+  if (url === "/" || target === homePath || target === "/") {
+    return current === homePath || current === "/";
+  }
+
+  return current === target || current.startsWith(`${target}/`);
+}
+
+function NavLink({ item, pathname }: { item: WebNavItem; pathname: string }) {
   const href = resolveNavHref(item.url);
-  const className = item.highlight ? "bc-btn-outline text-xs" : "bc-nav-link";
+  const active = !item.highlight && isNavActive(pathname, item.url);
+  const className = item.highlight
+    ? "bc-btn-outline bc-header-cta"
+    : active
+      ? "bc-nav-link is-active"
+      : "bc-nav-link";
   const external = href.startsWith("http");
 
   if (external || item.open_in_new_tab) {
@@ -45,24 +68,31 @@ function NavLink({ item }: { item: WebNavItem }) {
     );
   }
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} aria-current={active ? "page" : undefined}>
       {item.label}
     </Link>
   );
 }
 
-function NavDropdown({ item }: { item: WebNavItem }) {
+function NavDropdown({ item, pathname }: { item: WebNavItem; pathname: string }) {
   const [open, setOpen] = useState(false);
   const href = resolveNavHref(item.url);
   const children = item.children ?? [];
+  const active =
+    isNavActive(pathname, item.url) ||
+    children.some((child) => isNavActive(pathname, child.url));
 
   if (!children.length) {
-    return <NavLink item={item} />;
+    return <NavLink item={item} pathname={pathname} />;
   }
 
   return (
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <Link href={href} className="bc-nav-link inline-flex items-center gap-1">
+      <Link
+        href={href}
+        className={`bc-nav-link inline-flex items-center gap-1 ${active ? "is-active" : ""}`}
+        aria-current={active ? "page" : undefined}
+      >
         {item.label}
         <span className="text-[10px]" aria-hidden>
           ▾
@@ -70,26 +100,27 @@ function NavDropdown({ item }: { item: WebNavItem }) {
       </Link>
       {open ? (
         <div className="absolute left-0 top-full z-50 min-w-[200px] pt-2">
-          <div className="border border-[color:var(--bc-border)] bg-white py-2 shadow-lg">
+          <div className="rounded-md border border-[color:var(--bc-border)] bg-white py-2 shadow-lg">
             {children.map((child) => {
               const childHref = resolveNavHref(child.url);
+              const childActive = isNavActive(pathname, child.url);
               const external = childHref.startsWith("http");
+              const childClass = `block px-4 py-2 text-sm transition hover:bg-[color:var(--bc-accent-muted)] ${
+                childActive ? "font-semibold text-[color:var(--bc-secondary)]" : ""
+              }`;
+
               return external || child.open_in_new_tab ? (
                 <a
                   key={`${child.label}-${child.url}`}
                   href={childHref}
-                  className="block px-4 py-2 text-sm hover:bg-[color:var(--bc-accent-muted)]"
+                  className={childClass}
                   target="_blank"
                   rel="noreferrer"
                 >
                   {child.label}
                 </a>
               ) : (
-                <Link
-                  key={`${child.label}-${child.url}`}
-                  href={childHref}
-                  className="block px-4 py-2 text-sm hover:bg-[color:var(--bc-accent-muted)]"
-                >
+                <Link key={`${child.label}-${child.url}`} href={childHref} className={childClass}>
                   {child.label}
                 </Link>
               );
@@ -101,27 +132,46 @@ function NavDropdown({ item }: { item: WebNavItem }) {
   );
 }
 
-function DesktopNav({ items }: { items: WebNavItem[] }) {
+function DesktopNav({ items, pathname }: { items: WebNavItem[]; pathname: string }) {
   const regular = items.filter((item) => !item.highlight);
   const highlights = items.filter((item) => item.highlight);
 
   return (
-    <>
-      <nav className="hidden items-center gap-6 lg:flex">
+    <div className="hidden min-w-0 flex-1 items-center justify-between gap-6 lg:flex">
+      <nav className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 xl:gap-x-6" aria-label="Main">
         {regular.map((item) =>
           item.children?.length ? (
-            <NavDropdown key={`${item.label}-${item.url}`} item={item} />
+            <NavDropdown key={`${item.label}-${item.url}`} item={item} pathname={pathname} />
           ) : (
-            <NavLink key={`${item.label}-${item.url}`} item={item} />
+            <NavLink key={`${item.label}-${item.url}`} item={item} pathname={pathname} />
           ),
         )}
       </nav>
-      <div className="hidden items-center gap-3 sm:flex">
-        {highlights.map((item) => (
-          <NavLink key={`${item.label}-${item.url}`} item={item} />
-        ))}
-      </div>
-    </>
+      {highlights.length ? (
+        <div className="flex shrink-0 items-center gap-3">
+          {highlights.map((item) => (
+            <NavLink key={`${item.label}-${item.url}`} item={item} pathname={pathname} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StaffLoginLink({ pathname, className = "" }: { pathname: string; className?: string }) {
+  const href = withBasePath("/staff/login");
+  const current = normalizePath(pathname);
+  const target = normalizePath(href);
+  const active = current === target || current.startsWith(`${normalizePath(withBasePath("/staff"))}/`);
+
+  return (
+    <Link
+      href={href}
+      className={`bc-header-staff-link ${active ? "is-active" : ""} ${className}`.trim()}
+      aria-current={active ? "page" : undefined}
+    >
+      Staff login
+    </Link>
   );
 }
 
@@ -146,18 +196,31 @@ function MobileNav({ items, pathname }: { items: WebNavItem[]; pathname: string 
 
   return (
     <div className="relative lg:hidden">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="bc-nav-link px-2 py-1" aria-expanded={open}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="bc-header-menu-btn"
+        aria-expanded={open}
+        aria-controls="bc-mobile-nav"
+      >
         Menu {open ? "▴" : "▾"}
       </button>
       {open ? (
-        <div className="absolute left-0 right-0 top-full z-50 border-b border-[color:var(--bc-border)] bg-white px-4 py-4 shadow-lg">
-          <div className="flex flex-col gap-3">
+        <div
+          id="bc-mobile-nav"
+          className="absolute right-0 top-full z-50 mt-2 min-w-[min(100vw-2rem,18rem)] rounded-lg border border-[color:var(--bc-border)] bg-white px-4 py-4 shadow-lg"
+        >
+          <div className="flex flex-col gap-1">
             {flat.map((item) => (
-              <NavLink key={`mobile-${item.label}-${item.url}`} item={item} />
+              <NavLink key={`mobile-${item.label}-${item.url}`} item={item} pathname={pathname} />
             ))}
-            <Link href={withBasePath("/book/appointments")} className="text-sm text-[color:var(--bc-muted)]">
+            <Link
+              href={withBasePath("/book/appointments")}
+              className="bc-nav-link mt-2 border-t border-[color:var(--bc-border)] pt-3 text-[color:var(--bc-muted)]"
+            >
               My bookings
             </Link>
+            <StaffLoginLink pathname={pathname} className="mt-1" />
           </div>
         </div>
       ) : null}
@@ -177,24 +240,25 @@ export function PublicHeader({ bootstrap }: { bootstrap: PublicBootstrap }) {
     <>
       {showPromo ? <PromoBar text={branding.promo_bar_text!} /> : null}
       <header className="bc-site-header">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link href={withBasePath("/")} className="group flex min-w-0 items-center">
+        <div className="bc-site-header-inner mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-3 sm:gap-6 sm:px-6">
+          <Link href={withBasePath("/")} className="group flex shrink-0 items-center" aria-label={`${salon} home`}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt={salon} className="h-10 w-auto max-w-[180px] object-contain" />
+              <img src={logo} alt={salon} className="h-9 w-auto max-w-[160px] object-contain sm:h-10 sm:max-w-[180px]" />
             ) : (
-              <span className="font-display text-3xl tracking-[0.08em] text-[color:var(--bc-gold)]">
+              <span className="font-display text-2xl tracking-[0.08em] text-[color:var(--bc-gold)] sm:text-3xl">
                 {salon.split(" ")[0]?.toUpperCase() ?? "SALON"}
               </span>
             )}
           </Link>
-          <div className="flex items-center gap-4">
-            <CustomerSessionBar />
-          </div>
-        </div>
-        <div className="border-t border-[color:var(--bc-border)]">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-            <DesktopNav items={navigation} />
+
+          <DesktopNav items={navigation} pathname={pathname} />
+
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="hidden items-center gap-3 sm:flex">
+              <CustomerSessionBar />
+              <StaffLoginLink pathname={pathname} />
+            </div>
             <MobileNav items={navigation} pathname={pathname} />
           </div>
         </div>

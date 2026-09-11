@@ -28,6 +28,51 @@ export interface AvailabilitySlot {
   services: string[];
 }
 
+export interface SchedulePlanEmployee {
+  employee: string;
+  employee_name: string;
+  employee_image?: string;
+}
+
+export interface SchedulePlanService {
+  service: string;
+  service_name: string;
+  duration_minutes: number;
+  employees: SchedulePlanEmployee[];
+}
+
+export interface BookingSchedulePlan {
+  recommended_mode: "unified" | "split";
+  allow_unified: boolean;
+  allow_split: boolean;
+  service_count: number;
+  unified_employees: SchedulePlanEmployee[];
+  services: SchedulePlanService[];
+}
+
+export interface ServiceAssignment {
+  beauty_service: string;
+  employee: string;
+  employee_name?: string;
+  start_time: string;
+  end_time?: string;
+}
+
+export type ScheduleSelection =
+  | {
+      mode: "unified";
+      employee: string;
+      employee_name: string;
+      employee_image?: string;
+      start_time: string;
+      end_time: string;
+      duration_minutes: number;
+    }
+  | {
+      mode: "split";
+      assignments: ServiceAssignment[];
+    };
+
 export interface BeautyAppointment {
   name: string;
   beauty_branch?: string;
@@ -91,14 +136,24 @@ export interface BookingReceipt {
   pos_transaction?: string;
 }
 
-export interface ReceptionDashboard {
+export interface ReceptionDashboardSummary {
+  total_appointments?: number;
   booked?: number;
   checked_in?: number;
   waiting?: number;
   in_service?: number;
   completed?: number;
+  cancelled?: number;
+  no_show?: number;
   walk_ins?: number;
   expected_revenue?: number;
+}
+
+export interface ReceptionDashboard extends ReceptionDashboardSummary {
+  beauty_branch?: string;
+  appointment_date?: string;
+  summary?: ReceptionDashboardSummary;
+  queue_count?: number;
 }
 
 export interface CalendarEvent {
@@ -124,6 +179,7 @@ export interface CalendarEvent {
   beauty_service?: string;
   payment_status?: string;
   service_row?: number;
+  has_invoice?: boolean;
 }
 
 export interface CalendarContext {
@@ -161,6 +217,7 @@ export interface BeauticianScheduleLine {
   appointment_status?: string;
   line_status?: string;
   payment_status?: string;
+  has_invoice?: boolean;
 }
 
 export interface StockRow {

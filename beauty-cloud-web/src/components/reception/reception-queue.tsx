@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import { BranchField } from "@/components/staff/branch-field";
 import { getReceptionQueue } from "@/lib/api/browser-client";
+import { useStaffBranch } from "@/lib/use-staff-branch";
 import type { BeautyAppointment } from "@/lib/api/types";
 import { customerInitials } from "@/components/pos/pos-utils";
 import { QueueAppointmentActions } from "@/components/reception/appointment-actions";
@@ -26,7 +28,7 @@ function formatTime(value?: string): string {
 }
 
 export function ReceptionQueueView() {
-  const [branch, setBranch] = useState("BBY-MAIN");
+  const { branch, setBranch, branches, branchLocked, branchLabel, ready } = useStaffBranch();
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [queue, setQueue] = useState<BeautyAppointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +44,9 @@ export function ReceptionQueueView() {
   }
 
   useEffect(() => {
+    if (!ready || !branch) return;
     load();
-  }, [branch, date]);
+  }, [branch, date, ready]);
 
   return (
     <div className="space-y-5">
@@ -54,10 +57,14 @@ export function ReceptionQueueView() {
       </div>
 
       <div className="pos-filters-bar">
-        <div className="min-w-[140px] flex-1">
-          <Label htmlFor="branch">Branch</Label>
-          <Input id="branch" value={branch} onChange={(e) => setBranch(e.target.value)} className="mt-1.5" />
-        </div>
+        <BranchField
+          className="min-w-[140px] flex-1"
+          branch={branch}
+          branches={branches}
+          branchLocked={branchLocked}
+          branchLabel={branchLabel}
+          onChange={setBranch}
+        />
         <div className="min-w-[140px] flex-1">
           <Label htmlFor="date">Date</Label>
           <Input

@@ -7,6 +7,7 @@ import "./pos.css";
 
 import {
   checkoutPosCart,
+  fetchBootstrap,
   getBranches,
   getPosCatalogue,
   getPosOrders,
@@ -14,6 +15,7 @@ import {
   getPosPaymentMethods,
   getPosProductGroups,
   getPosServiceCategories,
+  issuePosInvoice,
   loadPosAppointment,
   lookupPosBarcode,
   searchPosCustomers,
@@ -31,6 +33,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/states";
+import { UserMessage } from "@/components/ui/user-message";
+import { formatUserMessage } from "@/lib/format-user-message";
 import {
   categoryIcon,
   customerInitials,
@@ -41,12 +45,19 @@ import {
   serviceIcon,
 } from "@/components/pos/pos-utils";
 import { printPosReceipt } from "@/components/pos/pos-receipt-print";
-import { loadStoredRegister } from "@/components/pos/pos-register-store";
+import { loadStoredRegisterForBranch } from "@/components/pos/pos-register-store";
 import type { PosSessionContext } from "@/components/pos/pos-session-types";
 import { evaluatePosCheckoutReady } from "@/components/pos/pos-session-utils";
 import { PosFulfillmentScreen } from "@/components/pos/pos-fulfillment-screen";
 import { PosSessionScreen } from "@/components/pos/pos-session-screen";
 import { PosSessionStatus } from "@/components/pos/pos-session-status";
+import {
+  initTenderLines,
+  parseTenderAmount,
+  PosTenderSection,
+  sumTender,
+  type TenderLine,
+} from "@/components/pos/pos-tender-section";
 
 const WALKIN_CUSTOMER = "Walk-In Guest";
 
@@ -112,6 +123,11 @@ export function PosWorkspace() {
   const [customerName, setCustomerName] = useState(WALKIN_CUSTOMER);
   const [linkedAppointment, setLinkedAppointment] = useState<string>();
   const [paymentStatus, setPaymentStatus] = useState<string>();
+  const [needsInvoice, setNeedsInvoice] = useState(false);
+  const [hasInvoice, setHasInvoice] = useState(false);
+  const [prepaid, setPrepaid] = useState(false);
+  const [existingInvoice, setExistingInvoice] = useState<string>();
+  const [existingPosTransaction, setExistingPosTransaction] = useState<string>();
 
   const [catalogueTab, setCatalogueTab] = useState<CatalogueTab>("services");
   const [serviceCategories, setServiceCategories] = useState<PosServiceCategory[]>([]);
@@ -125,7 +141,7 @@ export function PosWorkspace() {
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerHits, setCustomerHits] = useState<PosCustomerHit[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(["Cash"]);
-  const [selectedPayment, setSelectedPayment] = useState("Cash");
+  const [tenderLines, setTenderLines] = useState<TenderLine[]>(() => initTenderLines("Cash"));
 
   const [receipt, setReceipt] = useState<Record<string, unknown> | null>(null);
   const [posReady, setPosReady] = useState(false);
@@ -151,10 +167,14 @@ export function PosWorkspace() {
     setProductGroups(prodGroups ?? []);
     const modes = payModes?.length ? payModes : ["Cash"];
     setPaymentMethods(modes);
-    if (!modes.includes(selectedPayment)) setSelectedPayment(modes[0]);
+    setTenderLines((prev) =>
+      prev.map((line) =>
+        modes.includes(line.mode) ? line : { ...line, mode: modes[0] },
+      ),
+    );
     if (!selectedCategory && svcCat.categories?.[0]) setSelectedCategory(svcCat.categories[0].name);
     if (!selectedProductGroup && prodGroups?.[0]) setSelectedProductGroup(prodGroups[0].name);
-  }, [branch, selectedCategory, selectedProductGroup, selectedPayment]);
+  }, [branch, selectedCategory, selectedProductGroup]);
 
   const loadProducts = useCallback(async () => {
     const cat = await getPosCatalogue({
@@ -166,10 +186,16 @@ export function PosWorkspace() {
   }, [branch, catalogSearch, selectedProductGroup]);
 
   useEffect(() => {
-    getBranches()
-      .then((b) => {
+    Promise.all([getBranches({ staff: true }), fetchBootstrap()])
+      .then(([b, bootstrap]) => {
         setBranches(b);
-        if (b[0]?.name) setBranch(b[0].name);
+        const scoped = bootstrap.staff_workflow?.default_branch;
+        const fallback = b[0]?.name;
+        if (scoped && b.some((row) => row.name === scoped)) {
+          setBranch(scoped);
+        } else if (fallback) {
+          setBranch(fallback);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -194,6 +220,12 @@ export function PosWorkspace() {
     initialAppointmentOpened.current = true;
     void openAppointmentByName(initialAppointment);
   }, [loading, initialAppointment]);
+
+  useEffect(() => {
+    if (items.length === 0 && !receipt && !(linkedAppointment && hasInvoice)) {
+      setTenderLines(initTenderLines(paymentMethods[0] ?? "Cash"));
+    }
+  }, [items.length, receipt, linkedAppointment, hasInvoice, paymentMethods]);
 
   useEffect(() => {
     if (customerQuery.trim().length < 2) {
@@ -240,6 +272,39 @@ export function PosWorkspace() {
   }, [activeCategory, catalogSearch]);
 
   const grandTotal = items.reduce((sum, line) => sum + (line.rate ?? 0) * (line.qty ?? 1), 0);
+  const appointmentInvoiced = Boolean(linkedAppointment && hasInvoice);
+  const checkoutComplete = Boolean(receipt || appointmentInvoiced);
+  const appointmentCheckout = Boolean(linkedAppointment && needsInvoice && !appointmentInvoiced);
+  const appointmentComplete = Boolean(linkedAppointment && checkoutComplete);
+  const showCatalog = !linkedAppointment;
+  const tenderPaid = sumTender(tenderLines);
+  const tenderChange = Math.max(tenderPaid - grandTotal, 0);
+  const tenderReady = prepaid || tenderPaid >= grandTotal;
+  const invoiceNumber = receipt?.invoice ? String(receipt.invoice) : existingInvoice;
+  const transactionNumber = receipt?.name ? String(receipt.name) : existingPosTransaction;
+
+  function printCurrentReceipt() {
+    if (!transactionNumber) return;
+    printPosReceipt({
+      transaction: transactionNumber,
+      invoice: invoiceNumber,
+      customer: customerName,
+      items,
+      total: grandTotal,
+      paymentMode: prepaid
+        ? "Prepaid (online/kiosk)"
+        : tenderLines
+            .filter((line) => parseTenderAmount(line.amount) > 0)
+            .map((line) => `${line.mode} SAR ${parseTenderAmount(line.amount).toFixed(2)}`)
+            .join(" · ") || "—",
+      appointment: linkedAppointment,
+    });
+  }
+
+  function openRegisterDay() {
+    setScreen("list");
+    setWorkspaceTab("session");
+  }
 
   function resetTicket() {
     setItems(EMPTY_CART);
@@ -247,12 +312,18 @@ export function PosWorkspace() {
     setCustomerName(WALKIN_CUSTOMER);
     setLinkedAppointment(undefined);
     setPaymentStatus(undefined);
+    setNeedsInvoice(false);
+    setHasInvoice(false);
+    setPrepaid(false);
+    setExistingInvoice(undefined);
+    setExistingPosTransaction(undefined);
     setReceipt(null);
     setError(null);
     setCustomerQuery("");
     setCustomerHits([]);
     setCatalogSearch("");
     setBarcode("");
+    setTenderLines(initTenderLines(paymentMethods[0] ?? "Cash"));
   }
 
   function startNewOrder() {
@@ -269,9 +340,16 @@ export function PosWorkspace() {
       setBranch(appt.beauty_branch ?? branch);
       setCustomer(appt.customer ?? WALKIN_CUSTOMER);
       setCustomerName(appt.customer_name ?? appt.customer ?? "");
-      setItems(appt.items?.length ? appt.items : EMPTY_CART);
+      const cartItems = appt.items?.length ? appt.items : EMPTY_CART;
+      setItems(cartItems);
+      setTenderLines(initTenderLines(paymentMethods[0] ?? "Cash"));
       setLinkedAppointment(appt.beauty_appointment);
       setPaymentStatus(appt.payment_status);
+      setNeedsInvoice(Boolean(appt.needs_invoice));
+      setHasInvoice(Boolean(appt.has_invoice));
+      setPrepaid(Boolean(appt.prepaid));
+      setExistingInvoice(appt.invoice);
+      setExistingPosTransaction(appt.pos_transaction);
       setReceipt(null);
       setScreen("order");
       setCatalogueTab("services");
@@ -354,7 +432,7 @@ export function PosWorkspace() {
       return;
     }
 
-    const paired = loadStoredRegister();
+    const paired = loadStoredRegisterForBranch(branch);
     try {
       const ctx = (await getPosSessionContext({
         beauty_branch: branch,
@@ -378,32 +456,50 @@ export function PosWorkspace() {
       return;
     }
 
+    const payments = tenderLines
+      .map((line) => ({
+        mode_of_payment: line.mode,
+        amount: parseTenderAmount(line.amount),
+      }))
+      .filter((row) => row.amount > 0);
+
+    if (!prepaid) {
+      if (payments.length === 0) {
+        setError("Enter at least one payment in the tender section.");
+        return;
+      }
+      if (tenderPaid < grandTotal) {
+        setError(`Payment short by SAR ${(grandTotal - tenderPaid).toFixed(2)}.`);
+        return;
+      }
+    }
+
     setBusy(true);
     setError(null);
     try {
-      const result = (await checkoutPosCart({
-        customer,
-        beauty_branch: branch,
-        beauty_appointment: linkedAppointment,
-        items,
-        payments: [{ mode_of_payment: selectedPayment, amount: grandTotal }],
+      const sessionPayload = {
         register_code: paired?.register_code,
         register_api_key: paired?.register_api_key,
-      })) as { name?: string; invoice?: string };
+      };
+      const result = (await (prepaid && needsInvoice && linkedAppointment
+        ? issuePosInvoice({ name: linkedAppointment, ...sessionPayload })
+        : checkoutPosCart({
+            customer,
+            beauty_branch: branch,
+            beauty_appointment: linkedAppointment,
+            items,
+            payments,
+            ...sessionPayload,
+          }))) as { name?: string; invoice?: string };
       setReceipt(result as Record<string, unknown>);
       setPaymentStatus("Paid");
-      printPosReceipt({
-        transaction: String(result.name ?? ""),
-        invoice: result.invoice ? String(result.invoice) : undefined,
-        customer: customerName,
-        items,
-        total: grandTotal,
-        paymentMode: selectedPayment,
-        appointment: linkedAppointment,
-      });
+      setNeedsInvoice(false);
+      setHasInvoice(true);
+      setExistingInvoice(result.invoice ? String(result.invoice) : undefined);
+      setExistingPosTransaction(result.name ? String(result.name) : undefined);
       void loadOrders();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Payment failed");
+      setError(formatUserMessage(e instanceof Error ? e.message : "Payment failed"));
     } finally {
       setBusy(false);
     }
@@ -417,7 +513,12 @@ export function PosWorkspace() {
     return (
       <div className="pos-shell pos-compact space-y-4">
         <PosTopTabs active={workspaceTab} onChange={setWorkspaceTab} />
-        <PosSessionScreen branch={branch} onReadyChange={setPosReady} />
+        <PosSessionScreen
+          branch={branch}
+          branches={branches}
+          onBranchChange={setBranch}
+          onReadyChange={setPosReady}
+        />
       </div>
     );
   }
@@ -454,21 +555,30 @@ export function PosWorkspace() {
         />
 
         <div className="pos-filters-bar">
-          <div className="min-w-[140px] flex-1">
-            <Label htmlFor="pos-branch">Branch</Label>
-            <select
-              id="pos-branch"
-              className="mt-1.5 min-h-12 w-full rounded-full border border-[color:var(--bc-border)] bg-white px-4 text-sm shadow-sm outline-none focus:border-[color:var(--bc-secondary)]"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-            >
-              {branches.map((b) => (
-                <option key={b.name} value={b.name}>
-                  {b.branch_name ?? b.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {branches.length > 1 ? (
+            <div className="min-w-[140px] flex-1">
+              <Label htmlFor="pos-branch">Branch</Label>
+              <select
+                id="pos-branch"
+                className="mt-1.5 min-h-12 w-full rounded-full border border-[color:var(--bc-border)] bg-white px-4 text-sm shadow-sm outline-none focus:border-[color:var(--bc-secondary)]"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+              >
+                {branches.map((b) => (
+                  <option key={b.name} value={b.name}>
+                    {b.branch_name ?? b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : branches.length === 1 ? (
+            <div className="min-w-[140px] flex-1">
+              <Label>Branch</Label>
+              <p className="mt-1.5 min-h-12 rounded-full border border-[color:var(--bc-border)] bg-white px-4 py-3 text-sm">
+                {branches[0]?.branch_name ?? branches[0]?.name ?? branch}
+              </p>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {(["all", "unpaid", "waiting"] as OrderFilter[]).map((f) => (
               <button
@@ -555,126 +665,198 @@ export function PosWorkspace() {
             </h2>
           </div>
         </div>
-        {linkedAppointment ? (
-          <Badge tone={paymentTone(paymentStatus)}>{paymentStatus ?? "Unpaid"}</Badge>
+        {linkedAppointment && !checkoutComplete ? (
+          prepaid ? (
+            <Badge tone="accent">Prepaid</Badge>
+          ) : tenderReady ? (
+            <Badge tone="success">Ready to collect</Badge>
+          ) : (
+            <Badge tone="warning">
+              {tenderPaid > 0
+                ? `Balance SAR ${(grandTotal - tenderPaid).toFixed(2)}`
+                : `Due SAR ${grandTotal}`}
+            </Badge>
+          )
+        ) : linkedAppointment ? (
+          <Badge tone={appointmentComplete ? "success" : paymentTone(paymentStatus)}>
+            {appointmentComplete ? "Paid · Invoiced" : paymentStatus ?? "Unpaid"}
+          </Badge>
         ) : null}
       </div>
 
-      <PosSessionStatus
-        branch={branch}
-        onReadyChange={(ready, reason) => {
-          setPosReady(ready);
-          setPosBlockReason(reason ?? null);
-        }}
-        onManage={() => {
-          setScreen("list");
-          setWorkspaceTab("session");
-        }}
-      />
+      {!checkoutComplete ? (
+        <PosSessionStatus
+          branch={branch}
+          onReadyChange={(ready, reason) => {
+            setPosReady(ready);
+            setPosBlockReason(reason ?? null);
+          }}
+          onManage={openRegisterDay}
+        />
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+      {appointmentCheckout ? (
+        <div className="rounded-[var(--bc-radius-lg)] border border-[color:var(--bc-border)] bg-[image:var(--bc-hero-gradient)] px-4 py-3 text-sm">
+          <p className="font-semibold">
+            {prepaid ? "Issue salon invoice" : "Checked-in booking — collect payment in tender"}
+          </p>
+          <p className="mt-1 text-[color:var(--bc-muted)]">
+            {prepaid
+              ? "Payment was collected online or at kiosk. Issue the tax invoice so the beautician can start."
+              : "Use the tender section to split payment and give change, then collect & invoice."}
+          </p>
+        </div>
+      ) : null}
+
+      <div
+        className={
+          linkedAppointment
+            ? "mx-auto w-full max-w-md"
+            : "grid gap-4 lg:grid-cols-[1fr_340px]"
+        }
+      >
+        {showCatalog ? (
         <section className="pos-catalog flex flex-col overflow-hidden">
           <div className="pos-catalog-toolbar">
-            <p className="bc-section-title">Discover services & products</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`bc-chip ${catalogueTab === "services" ? "active" : "inactive"}`}
-                onClick={() => setCatalogueTab("services")}
-              >
-                Services
-              </button>
-              <button
-                type="button"
-                className={`bc-chip ${catalogueTab === "products" ? "active" : "inactive"}`}
-                onClick={() => setCatalogueTab("products")}
-              >
-                Products
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="bc-section-title">Add to ticket</p>
+              <div className="pos-catalog-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={catalogueTab === "services"}
+                  className={`pos-catalog-tab ${catalogueTab === "services" ? "active" : ""}`}
+                  onClick={() => setCatalogueTab("services")}
+                >
+                  Services
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={catalogueTab === "products"}
+                  className={`pos-catalog-tab ${catalogueTab === "products" ? "active" : ""}`}
+                  onClick={() => setCatalogueTab("products")}
+                >
+                  Products
+                </button>
+              </div>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_7rem_auto]">
+            <div className={`mt-3 grid gap-2 ${catalogueTab === "products" ? "sm:grid-cols-[1fr_7rem_auto]" : ""}`}>
               <div className="bc-search">
                 <span className="bc-search-icon" aria-hidden>
                   🔍
                 </span>
                 <input
-                  placeholder="Search catalogue…"
+                  placeholder={
+                    catalogueTab === "services" ? "Search services…" : "Search products…"
+                  }
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
                 />
               </div>
-              <Input
-                placeholder="Barcode"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void scanBarcode();
-                  }
-                }}
-                className="min-h-10 rounded-full text-sm"
-              />
-              <Button variant="secondary" onClick={() => void scanBarcode()} disabled={!barcode.trim()}>
-                Scan
-              </Button>
+              {catalogueTab === "products" ? (
+                <>
+                  <Input
+                    placeholder="Barcode"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void scanBarcode();
+                      }
+                    }}
+                    className="min-h-10 rounded-full text-sm"
+                  />
+                  <Button variant="secondary" onClick={() => void scanBarcode()} disabled={!barcode.trim()}>
+                    Scan
+                  </Button>
+                </>
+              ) : null}
             </div>
           </div>
 
           {catalogueTab === "services" ? (
-            <>
-              <div className="pos-categories-row">
-                {serviceCategories.map((cat) => (
-                  <button
-                    key={cat.name}
-                    type="button"
-                    className={`bc-cat-circle ${selectedCategory === cat.name ? "active" : ""}`}
-                    onClick={() => setSelectedCategory(cat.name)}
-                  >
-                    <span className="bc-cat-circle-icon">{categoryIcon(cat.label)}</span>
-                    <span className="bc-cat-circle-label">{cat.label}</span>
-                  </button>
-                ))}
+            <div className="pos-catalog-body">
+              <div className="pos-catalog-categories">
+                <p className="pos-catalog-section-label">Category</p>
+                <div className="bc-cat-root-row">
+                  {serviceCategories.map((cat) => (
+                    <button
+                      key={cat.name}
+                      type="button"
+                      className={`bc-cat-root-pill ${selectedCategory === cat.name ? "active" : ""}`}
+                      onClick={() => setSelectedCategory(cat.name)}
+                    >
+                      <span className="bc-cat-root-icon">{categoryIcon(cat.label)}</span>
+                      <span>{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="pos-catalog-scroll pos-services-list">
-                {visibleServices.map((service) => (
-                  <button
-                    key={service.name}
-                    type="button"
-                    onClick={() => addService(service)}
-                    className="bc-service-row"
-                  >
-                    <span className="bc-service-row-icon">{serviceIcon(service.service_name)}</span>
-                    <span className="bc-service-row-body">
-                      <span className="bc-service-row-title">{service.service_name}</span>
-                      <span className="bc-service-row-meta">
-                        {service.default_duration ?? "—"} min
-                      </span>
-                    </span>
-                    <span className="bc-service-row-price">
-                      SAR {service.standard_selling_price ?? 0}
-                    </span>
-                    <span className="bc-service-row-chevron" aria-hidden>
-                      ›
-                    </span>
-                  </button>
-                ))}
+              <div className="pos-catalog-services">
+                <div className="pos-catalog-section-header">
+                  <p className="pos-catalog-section-title">
+                    {activeCategory?.label ?? "Services"}
+                  </p>
+                  <span className="pos-catalog-section-count">
+                    {visibleServices.length} {visibleServices.length === 1 ? "service" : "services"}
+                  </span>
+                </div>
+                <div className="bc-service-list">
+                  {visibleServices.length === 0 ? (
+                    <p className="pos-catalog-empty">No services match your search</p>
+                  ) : (
+                    visibleServices.map((service) => (
+                      <button
+                        key={service.name}
+                        type="button"
+                        onClick={() => addService(service)}
+                        className="bc-service-list-row"
+                      >
+                        <span className="bc-service-list-accent" aria-hidden />
+                        <span className="bc-service-list-icon" aria-hidden>
+                          {serviceIcon(service.service_name)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="bc-service-list-title">{service.service_name}</span>
+                            {service.default_duration ? (
+                              <span className="bc-service-duration-badge">
+                                {service.default_duration} min
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
+                        <span className="bc-service-list-price">
+                          SAR {service.standard_selling_price ?? 0}
+                        </span>
+                        <span className="bc-service-add-btn" aria-hidden>
+                          +
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="pos-categories-row">
-                {productGroups.map((group) => (
-                  <button
-                    key={group.name}
-                    type="button"
-                    className={`bc-cat-circle ${selectedProductGroup === group.name ? "active" : ""}`}
-                    onClick={() => setSelectedProductGroup(group.name)}
-                  >
-                    <span className="bc-cat-circle-icon">{productIcon(group.name)}</span>
-                    <span className="bc-cat-circle-label">{group.name}</span>
-                  </button>
-                ))}
+            <div className="pos-catalog-body">
+              <div className="pos-catalog-categories">
+                <p className="pos-catalog-section-label">Product group</p>
+                <div className="bc-cat-root-row">
+                  {productGroups.map((group) => (
+                    <button
+                      key={group.name}
+                      type="button"
+                      className={`bc-cat-root-pill ${selectedProductGroup === group.name ? "active" : ""}`}
+                      onClick={() => setSelectedProductGroup(group.name)}
+                    >
+                      <span className="bc-cat-root-icon">{productIcon(group.name)}</span>
+                      <span>{group.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="pos-catalog-scroll pos-product-grid">
                 {products.length === 0 ? (
@@ -696,21 +878,33 @@ export function PosWorkspace() {
                   ))
                 )}
               </div>
-            </>
+            </div>
           )}
         </section>
+        ) : null}
 
-        <aside className="pos-ticket flex flex-col">
-          <div className="pos-ticket-header">
+        <aside className={`pos-ticket flex flex-col ${appointmentComplete ? "pos-ticket--complete" : ""}`}>
+          <div className={`pos-ticket-header ${appointmentComplete ? "pos-ticket-header--success" : ""}`}>
+            {appointmentComplete ? (
+              <p className="pos-ticket-complete-eyebrow">Checkout complete</p>
+            ) : null}
             <div className="flex items-center gap-2">
               <span className="bc-avatar">{customerInitials(customerName)}</span>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--bc-muted)]">
-                  Customer
+                  {appointmentComplete
+                    ? "Booking"
+                    : linkedAppointment
+                      ? "Checked-in guest"
+                      : "Customer"}
                 </p>
                 <p className="font-bold">{customerName}</p>
+                {linkedAppointment ? (
+                  <p className="text-xs text-[color:var(--bc-muted)]">{linkedAppointment}</p>
+                ) : null}
               </div>
             </div>
+            {!linkedAppointment ? (
             <Input
               id="customer-search"
               placeholder="Search name or mobile"
@@ -718,7 +912,8 @@ export function PosWorkspace() {
               onChange={(e) => setCustomerQuery(e.target.value)}
               className="mt-3 min-h-10 bg-white text-sm"
             />
-            {customerHits.length > 0 ? (
+            ) : null}
+            {!linkedAppointment && customerHits.length > 0 ? (
               <ul className="mt-2 overflow-hidden rounded-2xl border border-[color:var(--bc-border)] bg-white shadow-sm">
                 {customerHits.map((hit) => (
                   <li key={hit.name}>
@@ -740,7 +935,9 @@ export function PosWorkspace() {
 
           <div className="flex-1 p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--bc-muted)]">
-              Your ticket · {items.length} items
+              {appointmentComplete
+                ? `Invoiced · ${items.length} ${items.length === 1 ? "item" : "items"}`
+                : `Your ticket · ${items.length} items`}
             </p>
             {items.length === 0 ? (
               <p className="rounded-2xl bg-[color:var(--bc-accent-muted)] p-4 text-center text-sm text-[color:var(--bc-muted)]">
@@ -757,13 +954,15 @@ export function PosWorkspace() {
                       <span className="font-bold tabular-nums text-[color:var(--bc-secondary)]">
                         {(line.rate ?? 0) * (line.qty ?? 1)}
                       </span>
-                      <button
-                        type="button"
-                        className="text-lg text-[color:var(--bc-danger)]"
-                        onClick={() => removeItem(i)}
-                      >
-                        ×
-                      </button>
+                      {!appointmentInvoiced ? (
+                        <button
+                          type="button"
+                          className="text-lg text-[color:var(--bc-danger)]"
+                          onClick={() => removeItem(i)}
+                        >
+                          ×
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -777,69 +976,73 @@ export function PosWorkspace() {
               <span className="pos-ticket-total-amount">SAR {grandTotal}</span>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {paymentMethods.map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  className={`bc-chip ${selectedPayment === mode ? "active" : "inactive"}`}
-                  onClick={() => setSelectedPayment(mode)}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-
-            {error ? (
-              <div className="rounded-2xl border border-[color:var(--bc-danger)]/30 bg-[color:var(--bc-danger)]/5 px-3 py-2 text-xs text-[color:var(--bc-danger)]">
-                {error}
-              </div>
-            ) : null}
-
-            {receipt ? (
-              <div className="rounded-2xl bg-[color:var(--bc-success)]/10 p-3 text-xs">
-                <p className="font-bold text-[color:var(--bc-success)]">Payment complete ✓</p>
-                <p className="mt-1 text-[color:var(--bc-muted)]">
-                  {String(receipt.invoice ?? receipt.name)}
+            {checkoutComplete ? (
+              <div className="rounded-2xl bg-[color:var(--bc-success)]/10 p-4 text-sm">
+                <p className="font-bold text-[color:var(--bc-success)]">
+                  {linkedAppointment ? "Invoice issued ✓" : "Payment complete ✓"}
                 </p>
+                {invoiceNumber ? (
+                  <p className="mt-1 font-medium">{invoiceNumber}</p>
+                ) : null}
+                {prepaid ? (
+                  <p className="mt-2 text-xs text-[color:var(--bc-muted)]">
+                    Paid online or at kiosk — no additional payment at POS.
+                  </p>
+                ) : null}
+                {linkedAppointment ? (
+                  <p className="mt-2 text-xs text-[color:var(--bc-muted)]">
+                    Beautician can start the service from their schedule.
+                  </p>
+                ) : null}
                 <Button
                   variant="secondary"
-                  className="mt-2 w-full"
-                  onClick={() =>
-                    printPosReceipt({
-                      transaction: String(receipt.name ?? ""),
-                      invoice: receipt.invoice ? String(receipt.invoice) : undefined,
-                      customer: customerName,
-                      items,
-                      total: grandTotal,
-                      paymentMode: selectedPayment,
-                      appointment: linkedAppointment,
-                    })
-                  }
+                  className="mt-4 w-full"
+                  disabled={!transactionNumber}
+                  onClick={printCurrentReceipt}
                 >
                   Print receipt
                 </Button>
                 <Button variant="ghost" className="mt-2 w-full" onClick={() => setScreen("list")}>
-                  Done
+                  Back to orders
                 </Button>
               </div>
             ) : (
               <>
-                {!posReady && posBlockReason ? (
-                  <p className="rounded-2xl border border-[color:var(--bc-warning)]/40 bg-[color:var(--bc-warning)]/10 px-3 py-2 text-xs text-[color:var(--bc-warning)]">
-                    {posBlockReason}
+                {prepaid && needsInvoice ? (
+                  <p className="rounded-2xl bg-[color:var(--bc-accent-muted)] px-3 py-2 text-xs text-[color:var(--bc-muted)]">
+                    Prepaid booking — no additional payment. Invoice will reference the online/kiosk payment.
                   </p>
-                ) : null}
+                ) : (
+                  <PosTenderSection
+                    paymentMethods={paymentMethods}
+                    lines={tenderLines}
+                    onChange={setTenderLines}
+                    grandTotal={grandTotal}
+                  />
+                )}
+
+                {error ? <UserMessage message={error} className="text-xs" /> : null}
+
                 <Button
                   className="w-full"
                   onClick={() => void completePayment()}
-                  disabled={busy || items.length === 0 || !posReady}
+                  disabled={busy || items.length === 0 || !posReady || (!prepaid && !tenderReady)}
                 >
                   {busy
                     ? "Processing…"
                     : !posReady
-                      ? "Open register to pay"
-                      : `Pay · SAR ${grandTotal}`}
+                      ? "Open register first"
+                      : !prepaid && !tenderReady
+                        ? `Add SAR ${(grandTotal - tenderPaid).toFixed(2)} to tender`
+                        : prepaid && needsInvoice
+                          ? `Issue invoice · SAR ${grandTotal}`
+                          : needsInvoice
+                            ? tenderChange > 0
+                              ? `Collect & invoice · Change SAR ${tenderChange.toFixed(2)}`
+                              : `Collect & invoice · SAR ${grandTotal}`
+                            : tenderChange > 0
+                              ? `Pay · Change SAR ${tenderChange.toFixed(2)}`
+                              : `Pay · SAR ${grandTotal}`}
                 </Button>
               </>
             )}

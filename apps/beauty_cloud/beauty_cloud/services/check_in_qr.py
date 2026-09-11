@@ -15,8 +15,15 @@ def require_qr_for_check_in() -> bool:
 	return bool(frappe.db.get_single_value("Beauty Cloud Settings", "require_qr_for_check_in"))
 
 
+def require_id_for_check_in() -> bool:
+	return bool(frappe.db.get_single_value("Beauty Cloud Settings", "require_id_for_check_in"))
+
+
 def get_check_in_settings() -> dict:
-	return {"require_qr_for_check_in": require_qr_for_check_in()}
+	return {
+		"require_qr_for_check_in": require_qr_for_check_in(),
+		"require_id_for_check_in": require_id_for_check_in(),
+	}
 
 
 def _signing_secret() -> str:
@@ -86,6 +93,47 @@ def assert_check_in_token(appointment: str, token: str | None) -> None:
 			_("Scan the customer's appointment QR code to verify before check-in."),
 			title=_("QR Verification Required"),
 		)
+
+
+def assert_check_in_id(appointment: str, check_in_id: str | None) -> None:
+	if not require_id_for_check_in():
+		return
+
+	entered = (check_in_id or "").strip().upper()
+	expected = (appointment or "").strip().upper()
+	if not entered:
+		frappe.throw(
+			_("Enter the guest's appointment ID to verify before check-in."),
+			title=_("Appointment ID Required"),
+		)
+	if entered != expected:
+		frappe.throw(
+			_("Appointment ID {0} does not match this booking ({1}).").format(entered, appointment),
+			title=_("Appointment ID Mismatch"),
+		)
+	if not frappe.db.exists("Beauty Appointment", appointment):
+		frappe.throw(_("Appointment {0} not found").format(appointment))
+
+
+def assert_check_in_verification(
+	appointment: str,
+	check_in_token: str | None = None,
+	check_in_id: str | None = None,
+) -> None:
+	"""Require QR or ID validation per settings — never allow blind check-in."""
+	qr_required = require_qr_for_check_in()
+	id_required = require_id_for_check_in()
+
+	if not qr_required and not id_required:
+		frappe.throw(
+			_("Enable appointment QR or ID validation in Beauty Cloud Settings before check-in."),
+			title=_("Check-in Verification Required"),
+		)
+
+	if qr_required:
+		assert_check_in_token(appointment, check_in_token)
+	elif id_required:
+		assert_check_in_id(appointment, check_in_id)
 
 
 def get_check_in_qr_payload(appointment: str) -> dict:

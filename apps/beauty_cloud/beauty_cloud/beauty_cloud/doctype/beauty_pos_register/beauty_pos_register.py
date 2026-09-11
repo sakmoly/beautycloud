@@ -19,8 +19,21 @@ class BeautyPOSRegister(Document):
 
 @frappe.whitelist()
 def get_pairing_key(name: str) -> str:
-	_assert_register_manager()
+	name = (name or "").strip()
+	if not name:
+		frappe.throw(_("Register code is required"))
+	if len(name) >= 40 and not frappe.db.exists("Beauty POS Register", name):
+		frappe.throw(
+			_(
+				"That looks like an API key, not a register code. "
+				"Select the register (e.g. REG-02) first, then tap Fetch key."
+			),
+			title=_("Wrong Field"),
+		)
+	if not frappe.db.exists("Beauty POS Register", name):
+		frappe.throw(_("Register {0} was not found for this branch").format(name))
 	doc = frappe.get_doc("Beauty POS Register", name)
+	_assert_can_fetch_pairing_key(doc)
 	key = doc.get_password("api_key")
 	if not key:
 		frappe.throw(_("No API key on register {0}. Regenerate the key first.").format(name))
@@ -29,8 +42,8 @@ def get_pairing_key(name: str) -> str:
 
 @frappe.whitelist()
 def regenerate_pairing_key(name: str) -> str:
-	_assert_register_manager()
 	doc = frappe.get_doc("Beauty POS Register", name)
+	_assert_register_manager()
 	doc.api_key = _generate_api_key()
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
@@ -48,4 +61,16 @@ def _assert_register_manager():
 		return
 	roles = set(frappe.get_roles())
 	if not ({"System Manager", "Beauty Cloud Branch Manager"} & roles):
-		frappe.throw(_("Only a branch manager can view register pairing keys"))
+		frappe.throw(_("Only a branch manager can regenerate register pairing keys"))
+
+
+def _assert_can_fetch_pairing_key(register_doc):
+	from beauty_cloud.services.user_branch import assert_register_access, can_fetch_register_pairing_key
+
+	if not can_fetch_register_pairing_key():
+		frappe.throw(
+			_("You do not have permission to fetch register pairing keys"),
+			exc=frappe.PermissionError,
+		)
+	assert_register_access(register_doc)
+	register_doc.check_permission("read")

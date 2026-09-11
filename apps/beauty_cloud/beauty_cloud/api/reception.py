@@ -8,6 +8,7 @@ from beauty_cloud.services.reception import (
 	check_in_appointment,
 	complete_appointment,
 	confirm_appointment,
+	create_reception_booking,
 	create_walk_in,
 	get_calendar_context,
 	get_reception_calendar,
@@ -53,8 +54,8 @@ def confirm(name: str):
 
 
 @frappe.whitelist()
-def check_in(name: str, check_in_token: str | None = None):
-	return check_in_appointment(name, check_in_token)
+def check_in(name: str, check_in_token: str | None = None, check_in_id: str | None = None):
+	return check_in_appointment(name, check_in_token, check_in_id)
 
 
 @frappe.whitelist()
@@ -94,8 +95,8 @@ def restore(name: str):
 
 
 @frappe.whitelist()
-def reschedule(name: str, start_time: str, employee: str | None = None):
-	return reschedule_appointment(name, start_time, employee)
+def reschedule(name: str, start_time: str, employee: str | None = None, service_row: int | None = None):
+	return reschedule_appointment(name, start_time, employee, service_row)
 
 
 @frappe.whitelist()
@@ -106,6 +107,11 @@ def reassign(name: str, service_row: int, employee: str, start_time: str | None 
 @frappe.whitelist()
 def walk_in(data=None, **kwargs):
 	return create_walk_in(parse_payload(data, **kwargs))
+
+
+@frappe.whitelist()
+def create_booking(data=None, **kwargs):
+	return create_reception_booking(parse_payload(data, **kwargs))
 
 
 @frappe.whitelist()

@@ -20,6 +20,29 @@ export function loadStoredRegister(): StoredPosRegister | null {
   }
 }
 
+export function registerMatchesBranch(
+  stored: StoredPosRegister | null,
+  branch: string,
+): boolean {
+  if (!stored) return true;
+  if (!stored.beauty_branch) return false;
+  return stored.beauty_branch === branch;
+}
+
+export function loadStoredRegisterForBranch(branch: string): StoredPosRegister | null {
+  const stored = loadStoredRegister();
+  if (!registerMatchesBranch(stored, branch)) return null;
+  return stored;
+}
+
+export function clearStoredRegisterIfBranchMismatch(branch: string): StoredPosRegister | null {
+  const stored = loadStoredRegister();
+  if (!stored) return null;
+  if (registerMatchesBranch(stored, branch)) return stored;
+  clearStoredRegister();
+  return null;
+}
+
 export function saveStoredRegister(value: StoredPosRegister) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));

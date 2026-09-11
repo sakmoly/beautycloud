@@ -9,6 +9,7 @@
   "branch_code",
   "branch_name",
   "company",
+  "holiday_list",
   "is_active",
   "column_break_1",
   "pos_profile",
@@ -49,6 +50,13 @@
    "label": "Company",
    "options": "Company",
    "reqd": 1
+  },
+  {
+   "description": "Optional branch holiday list. Falls back to the company default holiday list when empty.",
+   "fieldname": "holiday_list",
+   "fieldtype": "Link",
+   "label": "Holiday List",
+   "options": "Holiday List"
   },
   {
    "default": "1",

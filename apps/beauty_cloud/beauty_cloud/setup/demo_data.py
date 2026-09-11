@@ -24,7 +24,9 @@ def ensure_defaults():
 	settings.otp_max_attempts = settings.otp_max_attempts or 5
 	settings.require_payment_at_booking = 1
 	settings.require_payment_before_service = 1
-	settings.require_payment_at_kiosk = 0
+	settings.require_payment_at_kiosk = 1
+	settings.auto_cancel_unpaid_draft_bookings = 1
+	settings.unpaid_draft_hold_minutes = settings.unpaid_draft_hold_minutes or 15
 	settings.booking_payment_type = settings.booking_payment_type or "Full Amount"
 	settings.booking_deposit_percent = settings.booking_deposit_percent or 50
 	settings.enable_telr = 1
@@ -36,33 +38,136 @@ def ensure_defaults():
 		"Telr demo mode is ON — booking uses simulated payment (test card 4111…). "
 		"No live Telr API calls are made until demo mode is disabled."
 	)
+	settings.enable_hr_schedule = 1
+	settings.hr_schedule_mode = settings.hr_schedule_mode or "HR Primary"
+	settings.block_booking_on_leave = 1
+	settings.block_booking_on_holidays = 1
+	settings.hr_use_default_shift = 1
+	settings.auto_sync_hr_shifts = 1
+	settings.hr_sync_days_ahead = settings.hr_sync_days_ahead or 90
 
-	if not settings.get("allowed_payment_methods"):
-		for mode in ("Cash", "Wire Transfer"):
-			if frappe.db.exists("Mode of Payment", mode):
-				settings.append(
-					"allowed_payment_methods",
-					{
-						"mode_of_payment": mode,
-						"enabled": 1,
-						"allow_in_booking": 1 if mode == "Cash" else 0,
-						"allow_in_pos": 1,
-						"allow_in_kiosk": 1 if mode == "Cash" else 0,
-					},
-				)
-		if frappe.db.exists("Mode of Payment", "Online Payment"):
-			settings.append(
-				"allowed_payment_methods",
-				{
-					"mode_of_payment": "Online Payment",
-					"enabled": 1,
-					"allow_in_booking": 1,
-					"allow_in_pos": 0,
-					"allow_in_kiosk": 0,
-				},
-			)
+	_ensure_salon_payment_modes(settings)
+	_ensure_tenant_public_url()
+	_ensure_vat(settings, company)
 
 	settings.save(ignore_permissions=True)
+
+
+def _ensure_vat(settings, company: str):
+	from beauty_cloud.services.vat import ensure_vat_setup
+
+	if not settings.sales_taxes_template:
+		settings.enable_vat = 1
+		settings.prices_include_vat = 1
+	settings.vat_percent = settings.vat_percent or 15
+
+	try:
+		result = ensure_vat_setup(company, settings=settings)
+		settings.vat_note = (
+			f"VAT {int(settings.vat_percent or 15)}% "
+			f"({'inclusive' if settings.prices_include_vat else 'exclusive'}) — "
+			f"template {result['sales_taxes_template']}"
+		)
+	except Exception:
+		frappe.log_error(title="Beauty Cloud VAT setup")
+		settings.vat_note = "VAT templates could not be created automatically — configure under Accounts."
+
+
+def _ensure_tenant_public_url():
+	"""Keep tenant public_url aligned with site host_name (Next.js on port 86)."""
+	import json
+
+	from frappe.utils import get_site_path
+
+	config_path = get_site_path("site_config.json")
+	try:
+		with open(config_path, encoding="utf-8") as handle:
+			config = json.load(handle)
+	except OSError:
+		return
+
+	host = (config.get("host_name") or "").strip().rstrip("/")
+	if not host:
+		return
+
+	tenant = frappe.db.get_value("Beauty Cloud Tenant", {"status": "Active"}, "name")
+	if tenant:
+		frappe.db.set_value("Beauty Cloud Tenant", tenant, "public_url", host)
+
+
+def _ensure_salon_payment_modes(settings=None):
+	"""Seed kiosk/pos payment modes: Cash, Mada (renamed from Wire Transfer), Credit Card."""
+	if settings is None:
+		settings = frappe.get_single("Beauty Cloud Settings")
+
+	company = settings.company or frappe.db.get_value("Company", {"company_name": COMPANY}, "name") or COMPANY
+
+	if frappe.db.exists("Mode of Payment", "Wire Transfer") and not frappe.db.exists("Mode of Payment", "Mada"):
+		frappe.rename_doc("Mode of Payment", "Wire Transfer", "Mada", force=True)
+
+	if not frappe.db.exists("Mode of Payment", "Mada"):
+		mada = frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": "Mada", "type": "Bank"})
+		mada.insert(ignore_permissions=True)
+		_copy_mode_of_payment_account("Cash", "Mada", company)
+
+	desired = {
+		"Cash": {"enabled": 1, "allow_in_booking": 1, "allow_in_pos": 1, "allow_in_kiosk": 0},
+		"Mada": {"enabled": 1, "allow_in_booking": 0, "allow_in_pos": 1, "allow_in_kiosk": 0},
+		"Credit Card": {"enabled": 1, "allow_in_booking": 0, "allow_in_pos": 1, "allow_in_kiosk": 0},
+		"Online Payment": {"enabled": 1, "allow_in_booking": 1, "allow_in_pos": 0, "allow_in_kiosk": 0},
+	}
+
+	rows_by_mode = {row.mode_of_payment: row for row in settings.get("allowed_payment_methods") or []}
+	for mode, flags in desired.items():
+		if not frappe.db.exists("Mode of Payment", mode):
+			continue
+		if mode in rows_by_mode:
+			for key, value in flags.items():
+				setattr(rows_by_mode[mode], key, value)
+		else:
+			settings.append("allowed_payment_methods", {"mode_of_payment": mode, **flags})
+
+	settings.set(
+		"allowed_payment_methods",
+		[row for row in settings.get("allowed_payment_methods") or [] if row.mode_of_payment != "Wire Transfer"],
+	)
+
+	if frappe.db.exists("Mode of Payment", "Credit Card"):
+		_ensure_mode_of_payment_account("Credit Card", company)
+	if frappe.db.exists("Mode of Payment", "Mada"):
+		_ensure_mode_of_payment_account("Mada", company)
+
+
+def _copy_mode_of_payment_account(from_mode: str, to_mode: str, company: str):
+	source = frappe.db.get_value(
+		"Mode of Payment Account",
+		{"parent": from_mode, "company": company},
+		"default_account",
+	)
+	if source:
+		_ensure_mode_of_payment_account(to_mode, company, source)
+
+
+def _ensure_mode_of_payment_account(mode: str, company: str, account: str | None = None):
+	if frappe.db.exists("Mode of Payment Account", {"parent": mode, "company": company}):
+		return
+	account = account or frappe.db.get_value(
+		"Mode of Payment Account",
+		{"parent": "Cash", "company": company},
+		"default_account",
+	) or frappe.db.get_value("Company", company, "default_cash_account")
+	if not account:
+		return
+	frappe.get_doc(
+		{
+			"doctype": "Mode of Payment Account",
+			"parent": mode,
+			"parenttype": "Mode of Payment",
+			"parentfield": "accounts",
+			"company": company,
+			"default_account": account,
+		}
+	).insert(ignore_permissions=True)
 
 
 def load_demo_data():
@@ -78,8 +183,12 @@ def load_demo_data():
 	_ensure_beauticians(company)
 	_ensure_employee_skills(company)
 	_ensure_employee_schedules(company)
+	_sync_hr_shifts(company)
 	_ensure_web_pages(company)
 	_ensure_pos_registers(company)
+	from beauty_cloud.setup.staff_users import ensure_staff_users
+
+	ensure_staff_users(company)
 	frappe.db.commit()
 
 
@@ -291,10 +400,12 @@ def _ensure_web_pages(company: str):
 		ensure_default_footer_menu,
 		ensure_default_menu,
 		ensure_default_web_pages,
+		ensure_home_menu_item,
 	)
 
 	ensure_default_web_pages(company)
 	ensure_default_menu(company)
+	ensure_home_menu_item(company)
 	ensure_default_footer_menu(company)
 
 
@@ -373,43 +484,53 @@ def _create_services(company: str):
 
 
 def _ensure_pos_registers(company: str):
-	if not frappe.db.exists("Beauty Branch", "BBY-MAIN"):
-		return
-
-	frappe.db.set_value(
-		"Beauty Branch",
-		"BBY-MAIN",
-		{
-			"require_business_day_for_pos": 1,
-			"require_register_session_for_pos": 1,
-			"require_all_registers_closed_for_day_close": 1,
-			"business_day_cutoff_time": "03:00:00",
-		},
-	)
-
-	registers = [
-		("REG-01", "Front Desk Counter"),
-		("REG-02", "Back Desk Counter"),
-	]
-	for code, name in registers:
-		if frappe.db.exists("Beauty POS Register", code):
-			continue
-		doc = frappe.get_doc(
-			{
-				"doctype": "Beauty POS Register",
-				"register_code": code,
-				"register_name": name,
-				"beauty_branch": "BBY-MAIN",
-				"company": company,
-				"is_active": 1,
-			}
-		)
-		doc.insert(ignore_permissions=True)
-
 	from beauty_cloud.services.register_session import get_open_business_day, open_business_day
 
-	if not get_open_business_day("BBY-MAIN"):
-		open_business_day("BBY-MAIN")
+	branch_registers = [
+		("BBY-MAIN", "REG-01", "Main Front Desk"),
+		("003", "REG-02", "Jeddah Front Desk"),
+	]
+
+	for branch, code, name in branch_registers:
+		if not frappe.db.exists("Beauty Branch", branch):
+			continue
+
+		frappe.db.set_value(
+			"Beauty Branch",
+			branch,
+			{
+				"require_business_day_for_pos": 1,
+				"require_register_session_for_pos": 1,
+				"require_all_registers_closed_for_day_close": 1,
+				"business_day_cutoff_time": "03:00:00",
+			},
+		)
+
+		if frappe.db.exists("Beauty POS Register", code):
+			frappe.db.set_value(
+				"Beauty POS Register",
+				code,
+				{
+					"register_name": name,
+					"beauty_branch": branch,
+					"company": company,
+					"is_active": 1,
+				},
+			)
+		else:
+			frappe.get_doc(
+				{
+					"doctype": "Beauty POS Register",
+					"register_code": code,
+					"register_name": name,
+					"beauty_branch": branch,
+					"company": company,
+					"is_active": 1,
+				}
+			).insert(ignore_permissions=True)
+
+		if not get_open_business_day(branch):
+			open_business_day(branch)
 
 
 def _ensure_branch_schedule(company: str):
@@ -626,6 +747,17 @@ def _ensure_employee_skills(company: str):
 					"skill_level": "Senior" if "Senior" in row.get("designation", "") else "Standard",
 				}
 			).insert(ignore_permissions=True)
+
+
+def _sync_hr_shifts(company: str):
+	from beauty_cloud.services.hr_schedule import hrms_available, sync_beauty_schedules_to_hr_shifts
+
+	if not hrms_available():
+		return
+	try:
+		sync_beauty_schedules_to_hr_shifts("BBY-MAIN", company=company, days_ahead=120)
+	except Exception:
+		frappe.log_error(title="Beauty Cloud HR shift sync failed")
 
 
 def _ensure_employee_schedules(company: str):

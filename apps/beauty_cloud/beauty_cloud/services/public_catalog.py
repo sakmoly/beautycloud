@@ -9,6 +9,7 @@ def get_public_service_catalog(
 	parent_category: str | None = None,
 	company: str | None = None,
 	online_only: bool = True,
+	kiosk_only: bool = False,
 ) -> dict:
 	"""Tree-aware catalog for public web: groups → subcategories → services."""
 	settings = frappe.get_single("Beauty Cloud Settings")
@@ -24,25 +25,25 @@ def get_public_service_catalog(
 		breadcrumb = _build_breadcrumb(parent_category)
 
 		if parent_doc.is_group:
-			categories = _fetch_child_categories(company, parent_category)
+			categories = _fetch_child_categories(company, parent_category, online_only, kiosk_only)
 			return {
-				"parent": _serialize_category(parent_doc),
+				"parent": _serialize_category(parent_doc, online_only, kiosk_only),
 				"categories": categories,
 				"services": [],
 				"breadcrumb": breadcrumb,
 				"level": "category",
 			}
 
-		services = _fetch_services(company, parent_category, online_only)
+		services = _fetch_services(company, parent_category, online_only, kiosk_only)
 		return {
-			"parent": _serialize_category(parent_doc),
+			"parent": _serialize_category(parent_doc, online_only, kiosk_only),
 			"categories": [],
 			"services": services,
 			"breadcrumb": breadcrumb,
 			"level": "services",
 		}
 
-	categories = _fetch_root_categories(company)
+	categories = _fetch_root_categories(company, online_only, kiosk_only)
 	return {
 		"parent": None,
 		"categories": categories,
@@ -52,7 +53,11 @@ def get_public_service_catalog(
 	}
 
 
-def _fetch_root_categories(company: str) -> list[dict]:
+def _fetch_root_categories(
+	company: str,
+	online_only: bool = True,
+	kiosk_only: bool = False,
+) -> list[dict]:
 	rows = frappe.get_all(
 		"Beauty Service Category",
 		filters={
@@ -71,7 +76,7 @@ def _fetch_root_categories(company: str) -> list[dict]:
 		order_by="sort_order asc, category_name asc",
 	)
 	if rows:
-		return [_serialize_category_row(row) for row in rows]
+		return [_serialize_category_row(row, online_only, kiosk_only) for row in rows]
 
 	# Legacy flat install: expose leaf categories at root.
 	leaf_rows = frappe.get_all(
@@ -87,10 +92,15 @@ def _fetch_root_categories(company: str) -> list[dict]:
 		],
 		order_by="sort_order asc, category_name asc",
 	)
-	return [_serialize_category_row(row) for row in leaf_rows]
+	return [_serialize_category_row(row, online_only, kiosk_only) for row in leaf_rows]
 
 
-def _fetch_child_categories(company: str, parent: str) -> list[dict]:
+def _fetch_child_categories(
+	company: str,
+	parent: str,
+	online_only: bool = True,
+	kiosk_only: bool = False,
+) -> list[dict]:
 	rows = frappe.get_all(
 		"Beauty Service Category",
 		filters={
@@ -108,12 +118,19 @@ def _fetch_child_categories(company: str, parent: str) -> list[dict]:
 		],
 		order_by="sort_order asc, category_name asc",
 	)
-	return [_serialize_category_row(row) for row in rows]
+	return [_serialize_category_row(row, online_only, kiosk_only) for row in rows]
 
 
-def _fetch_services(company: str, category: str, online_only: bool) -> list[dict]:
+def _fetch_services(
+	company: str,
+	category: str,
+	online_only: bool,
+	kiosk_only: bool = False,
+) -> list[dict]:
 	filters = {"company": company, "is_active": 1, "service_category": category}
-	if online_only:
+	if kiosk_only:
+		filters["kiosk_enabled"] = 1
+	elif online_only:
 		filters["online_booking_enabled"] = 1
 
 	rows = frappe.get_all(
@@ -137,7 +154,11 @@ def _fetch_services(company: str, category: str, online_only: bool) -> list[dict
 	return rows
 
 
-def _serialize_category(doc) -> dict:
+def _serialize_category(
+	doc,
+	online_only: bool = True,
+	kiosk_only: bool = False,
+) -> dict:
 	return _serialize_category_row(
 		{
 			"name": doc.name,
@@ -146,7 +167,9 @@ def _serialize_category(doc) -> dict:
 			"is_group": doc.is_group,
 			"sort_order": doc.sort_order,
 			"image": doc.image,
-		}
+		},
+		online_only,
+		kiosk_only,
 	)
 
 
@@ -156,7 +179,11 @@ def _category_value(row, field: str):
 	return getattr(row, field, None)
 
 
-def _serialize_category_row(row) -> dict:
+def _serialize_category_row(
+	row,
+	online_only: bool = True,
+	kiosk_only: bool = False,
+) -> dict:
 	name = _category_value(row, "name")
 	is_group = bool(_category_value(row, "is_group"))
 	child_count = frappe.db.count(
@@ -165,10 +192,12 @@ def _serialize_category_row(row) -> dict:
 	)
 	service_count = 0
 	if not is_group:
-		service_count = frappe.db.count(
-			"Beauty Service",
-			{"service_category": name, "is_active": 1, "online_booking_enabled": 1},
-		)
+		service_filters = {"service_category": name, "is_active": 1}
+		if kiosk_only:
+			service_filters["kiosk_enabled"] = 1
+		elif online_only:
+			service_filters["online_booking_enabled"] = 1
+		service_count = frappe.db.count("Beauty Service", service_filters)
 	return {
 		"name": name,
 		"label": _category_value(row, "category_name"),

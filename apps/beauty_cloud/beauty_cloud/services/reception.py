@@ -72,21 +72,23 @@ def get_reception_dashboard(beauty_branch: str, appointment_date: str | None = N
 
 	queue = get_waiting_queue(beauty_branch, appointment_date)
 
+	summary = {
+		"total_appointments": len(appointments),
+		"booked": counts.get("Booked", 0) + counts.get("Confirmed", 0),
+		"checked_in": counts.get("Checked In", 0),
+		"waiting": counts.get("Waiting", 0),
+		"in_service": counts.get("In Service", 0) + counts.get("Partially Completed", 0),
+		"completed": counts.get("Completed", 0),
+		"cancelled": counts.get("Cancelled", 0),
+		"no_show": counts.get("No Show", 0),
+		"walk_ins": walk_ins,
+		"expected_revenue": revenue_expected,
+	}
 	return {
 		"beauty_branch": beauty_branch,
 		"appointment_date": str(appointment_date),
-		"summary": {
-			"total_appointments": len(appointments),
-			"booked": counts.get("Booked", 0) + counts.get("Confirmed", 0),
-			"checked_in": counts.get("Checked In", 0),
-			"waiting": counts.get("Waiting", 0),
-			"in_service": counts.get("In Service", 0) + counts.get("Partially Completed", 0),
-			"completed": counts.get("Completed", 0),
-			"cancelled": counts.get("Cancelled", 0),
-			"no_show": counts.get("No Show", 0),
-			"walk_ins": walk_ins,
-			"revenue_expected": revenue_expected,
-		},
+		**summary,
+		"summary": summary,
 		"queue_count": len(queue),
 	}
 
@@ -162,6 +164,10 @@ def get_reception_calendar(
 
 	customer_contacts = _load_customer_contacts([a.customer for a in appointments if a.customer])
 
+	from beauty_cloud.services.invoice_gate import get_invoice_flags_for_appointments
+
+	invoice_flags = get_invoice_flags_for_appointments([a.name for a in appointments])
+
 	for appt in appointments:
 		lines = frappe.get_all(
 			"Beauty Appointment Service",
@@ -188,6 +194,7 @@ def get_reception_calendar(
 					appt,
 					line,
 					customer_contacts.get(appt.customer),
+					has_invoice=invoice_flags.get(appt.name, False),
 				)
 			)
 
@@ -258,10 +265,18 @@ def confirm_appointment(name: str) -> dict:
 	return doc.as_dict()
 
 
-def check_in_appointment(name: str, check_in_token: str | None = None) -> dict:
-	from beauty_cloud.services.check_in_qr import assert_check_in_token
+def check_in_appointment(
+	name: str,
+	check_in_token: str | None = None,
+	check_in_id: str | None = None,
+) -> dict:
+	from beauty_cloud.workflow_permissions import assert_can_check_in
+	from beauty_cloud.services.check_in_qr import assert_check_in_verification
+	from beauty_cloud.services.payment_gate import assert_payment_for_check_in
 
-	assert_check_in_token(name, check_in_token)
+	assert_can_check_in()
+	assert_payment_for_check_in(name)
+	assert_check_in_verification(name, check_in_token=check_in_token, check_in_id=check_in_id)
 	doc = frappe.get_doc("Beauty Appointment", name)
 	doc.check_permission("write")
 	if doc.status == "Draft":
@@ -277,18 +292,26 @@ def check_in_appointment(name: str, check_in_token: str | None = None) -> dict:
 
 
 def start_appointment(name: str, service_row: int | None = None) -> dict:
+	from beauty_cloud.services.invoice_gate import assert_invoice_before_service
+	from beauty_cloud.workflow_permissions import assert_can_start_service, assert_checked_in_before_service
+
+	assert_can_start_service()
 	doc = frappe.get_doc("Beauty Appointment", name)
 	doc.check_permission("write")
 	assert_payment_before_service(name)
-
-	if doc.status == "Draft":
-		_transition_status(doc, "Booked")
+	assert_checked_in_before_service(doc)
+	assert_invoice_before_service(doc)
 
 	if service_row:
 		row = _get_service_row(doc, int(service_row))
 		row.status = "In Service"
-		if doc.status in ("Checked In", "Waiting", "Confirmed", "Booked"):
+		if doc.status in ("Checked In", "Waiting"):
 			_transition_status(doc, "In Service")
+	elif doc.status in ("Checked In", "Waiting"):
+		_transition_status(doc, "In Service")
+		for row in doc.services:
+			if row.status == "Pending":
+				row.status = "In Service"
 	else:
 		_transition_status(doc, "In Service")
 		for row in doc.services:
@@ -300,6 +323,9 @@ def start_appointment(name: str, service_row: int | None = None) -> dict:
 
 
 def complete_appointment(name: str, service_row: int | None = None) -> dict:
+	from beauty_cloud.workflow_permissions import assert_can_complete_service
+
+	assert_can_complete_service()
 	doc = frappe.get_doc("Beauty Appointment", name)
 	doc.check_permission("write")
 	assert_payment_before_service(name)
@@ -369,18 +395,47 @@ def maybe_restore_appointment_after_payment(name: str, payment_status: str | Non
 		restore_appointment(name)
 
 
-def reschedule_appointment(name: str, start_time: str, employee: str | None = None) -> dict:
-	"""Move an appointment to a new date/time (and optionally another beautician)."""
-	from beauty_cloud.services.availability import validate_slot
-	from beauty_cloud.services.booking import _apply_slot_to_appointment, _validate_no_overlap
-
+def reschedule_appointment(
+	name: str,
+	start_time: str,
+	employee: str | None = None,
+	service_row: int | None = None,
+) -> dict:
+	"""Move an appointment (or one service line) to a new date/time."""
 	doc = frappe.get_doc("Beauty Appointment", name)
 	doc.check_permission("write")
 
 	if doc.status in ("Completed", "Cancelled", "No Show"):
 		frappe.throw(_("Cannot reschedule appointment in status {0}").format(doc.status))
 
+	if not doc.services:
+		frappe.throw(_("Appointment has no services to reschedule"))
+
 	prior_status = doc.status if doc.status not in ("Rescheduled", "Draft") else "Confirmed"
+	service_row = int(service_row) if service_row else None
+	assigned_employees = {row.employee for row in doc.services if row.employee}
+
+	if service_row:
+		result = _reschedule_service_row(doc, start_time, employee, service_row, prior_status)
+	elif len(doc.services) == 1:
+		result = _reschedule_unified_appointment(doc, start_time, employee, prior_status)
+	elif len(assigned_employees) > 1:
+		frappe.throw(
+			_(
+				"This booking uses different beauticians per service. "
+				"Open the service you want to move on the calendar and reschedule it there."
+			)
+		)
+	else:
+		result = _reschedule_unified_appointment(doc, start_time, employee, prior_status)
+
+	return result.as_dict()
+
+
+def _reschedule_unified_appointment(doc, start_time: str, employee: str | None, prior_status: str):
+	from beauty_cloud.services.availability import validate_slot
+	from beauty_cloud.services.booking import _apply_slot_to_appointment, _validate_no_overlap
+
 	service_codes = [row.beauty_service for row in doc.services]
 	employee = employee or (doc.services[0].employee if doc.services else None)
 	if not employee:
@@ -394,6 +449,7 @@ def reschedule_appointment(name: str, start_time: str, employee: str | None = No
 		start_time,
 		employee,
 		doc.service_location,
+		booking_channel="reception",
 	)
 
 	frappe.db.begin()
@@ -403,7 +459,7 @@ def reschedule_appointment(name: str, start_time: str, employee: str | None = No
 			employee,
 			slot["start_time"],
 			slot["end_time"],
-			exclude=name,
+			exclude=doc.name,
 		)
 		_apply_slot_to_appointment(doc, slot, employee)
 		doc.status = prior_status
@@ -413,7 +469,59 @@ def reschedule_appointment(name: str, start_time: str, employee: str | None = No
 		frappe.db.rollback()
 		raise
 
-	return doc.as_dict()
+	return doc
+
+
+def _reschedule_service_row(
+	doc,
+	start_time: str,
+	employee: str | None,
+	service_row: int,
+	prior_status: str,
+):
+	from beauty_cloud.services.availability import _get_duration_meta, validate_slot
+	from beauty_cloud.services.booking import _validate_no_overlap
+
+	row = _get_service_row(doc, service_row)
+	employee = employee or row.employee
+	if not employee:
+		frappe.throw(_("Select a beautician"))
+
+	new_date = getdate(start_time)
+	slot = validate_slot(
+		doc.beauty_branch,
+		str(new_date),
+		[row.beauty_service],
+		start_time,
+		employee,
+		doc.service_location,
+		booking_channel="reception",
+	)
+	meta = _get_duration_meta([row.beauty_service])["services"][0]
+
+	frappe.db.begin()
+	try:
+		_validate_no_overlap(
+			doc.beauty_branch,
+			employee,
+			slot["start_time"],
+			slot["end_time"],
+			exclude=doc.name,
+		)
+		row.employee = employee
+		row.employee_name = frappe.db.get_value("Employee", employee, "employee_name")
+		row.start_time = slot["start_time"]
+		row.end_time = slot["end_time"]
+		row.duration = meta["duration"]
+		doc.appointment_date = getdate(slot["start_time"])
+		doc.status = prior_status
+		doc.save()
+		frappe.db.commit()
+	except Exception:
+		frappe.db.rollback()
+		raise
+
+	return doc
 
 
 def reassign_beautician(
@@ -451,6 +559,17 @@ def reassign_beautician(
 	return doc.as_dict()
 
 
+def create_reception_booking(payload: dict) -> dict:
+	"""Book a customer appointment from reception (unified or split schedule)."""
+	from beauty_cloud.services.booking import create_booking
+
+	data = frappe._dict(payload)
+	data.source = "Reception"
+	data.setdefault("service_location", "Salon")
+	data.setdefault("status", "Booked")
+	return create_booking(data)
+
+
 def create_walk_in(payload: dict) -> dict:
 	"""Walk-in: search/create customer, assign service, queue or book immediately."""
 	data = frappe._dict(payload)
@@ -458,6 +577,8 @@ def create_walk_in(payload: dict) -> dict:
 	company = settings.company
 	branch = data.beauty_branch
 	services = _parse_services(data.services)
+	service_location = data.get("service_location") or "Salon"
+	booking_channel = "reception"
 
 	customer = data.customer or _get_or_create_customer(data.customer_name, data.mobile)
 	employee = data.employee
@@ -467,6 +588,42 @@ def create_walk_in(payload: dict) -> dict:
 	status = "Waiting"
 	start_time = data.start_time
 	scheduled_lines = []
+	service_assignments = data.get("service_assignments")
+	if isinstance(service_assignments, str):
+		import json
+
+		service_assignments = json.loads(service_assignments)
+	scheduling_mode = (data.get("scheduling_mode") or "").strip().lower()
+	use_split = scheduling_mode == "split" or bool(service_assignments)
+
+	if use_split and service_assignments:
+		from beauty_cloud.services.booking import _build_appointment_doc_from_lines
+		from beauty_cloud.services.booking_schedule import validate_service_assignments
+
+		validated_lines = validate_service_assignments(
+			branch,
+			appointment_date,
+			service_assignments,
+			service_location,
+			booking_channel,
+		)
+		doc = _build_appointment_doc_from_lines(
+			frappe._dict(
+				{
+					"beauty_branch": branch,
+					"appointment_date": appointment_date,
+					"service_location": service_location,
+					"notes": data.get("notes"),
+				}
+			),
+			company,
+			customer,
+			validated_lines,
+			status=data.get("status") or "Booked",
+		)
+		doc.source = "Walk-In"
+		doc.insert(ignore_permissions=True)
+		return doc.as_dict()
 
 	if employee and not start_time:
 		# Try next available slot today starting now (rounded to 15 min)
@@ -475,7 +632,8 @@ def create_walk_in(payload: dict) -> dict:
 			appointment_date=str(appointment_date),
 			services=services,
 			employee=employee,
-			service_location=data.get("service_location") or "Salon",
+			service_location=service_location,
+			booking_channel=booking_channel,
 		)
 		future_slots = [s for s in slots if get_datetime(s["start_time"]) >= now - timedelta(minutes=5)]
 		if future_slots:
@@ -491,7 +649,8 @@ def create_walk_in(payload: dict) -> dict:
 			services,
 			start_time,
 			employee,
-			data.get("service_location") or "Salon",
+			service_location,
+			booking_channel=booking_channel,
 		)
 		doc = _build_appointment_doc(
 			frappe._dict(
@@ -499,7 +658,7 @@ def create_walk_in(payload: dict) -> dict:
 					"beauty_branch": branch,
 					"appointment_date": appointment_date,
 					"employee": employee,
-					"service_location": data.get("service_location") or "Salon",
+					"service_location": service_location,
 					"notes": data.get("notes"),
 				}
 			),
@@ -600,7 +759,12 @@ def _load_customer_contacts(customer_ids: list[str]) -> dict[str, dict]:
 	}
 
 
-def _normalize_calendar_event(appt, line, customer_contact: dict | None = None) -> dict:
+def _normalize_calendar_event(
+	appt,
+	line,
+	customer_contact: dict | None = None,
+	has_invoice: bool = False,
+) -> dict:
 	start = line.start_time or appt.scheduled_start
 	end = line.end_time or appt.scheduled_end
 	start_str = str(start) if start else None
@@ -633,6 +797,7 @@ def _normalize_calendar_event(appt, line, customer_contact: dict | None = None) 
 		"line_status": line.status,
 		"status": line.status or appt.status,
 		"amount": line.amount,
+		"has_invoice": has_invoice,
 	}
 
 

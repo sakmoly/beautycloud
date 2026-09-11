@@ -4,3 +4,9 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+beauty_cloud.patches.v1_0.mark_existing_setup_complete
+beauty_cloud.patches.v1_0.setup_vat_templates
+beauty_cloud.patches.v1_0.setup_check_in_id_validation
+beauty_cloud.patches.v1_0.setup_check_in_before_service
+beauty_cloud.patches.v1_0.setup_invoice_before_service
+beauty_cloud.patches.v1_0.ensure_staff_users

@@ -11,6 +11,7 @@ from beauty_cloud.services.pos import (
 	get_product_categories,
 	get_service_catalog,
 	get_today_orders,
+	issue_appointment_invoice,
 	load_appointment_for_pos,
 	lookup_barcode,
 	refund_transaction,
@@ -32,6 +33,11 @@ def checkout_cart(data=None, **kwargs):
 @frappe.whitelist()
 def load_appointment(name: str):
 	return load_appointment_for_pos(name)
+
+
+@frappe.whitelist()
+def issue_invoice(name: str, data=None, **kwargs):
+	return issue_appointment_invoice(name, parse_payload(data, **kwargs))
 
 
 @frappe.whitelist()

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { StaffLogoutButton } from "@/components/layout/staff-logout-button";
 import { StaffNav } from "@/components/layout/staff-nav";
 import type { PublicBootstrap } from "@/lib/frappe/types";
 import type { StaffSession } from "@/lib/frappe/types";
@@ -32,12 +33,10 @@ export function StaffShell({
             </p>
             <p className="text-xs text-[color:var(--bc-muted)]">Staff workspace</p>
           </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-lg shadow-sm">
-            ✦
-          </div>
+          <StaffLogoutButton />
         </div>
         <div className={`mx-auto w-full ${maxW} ${compact ? "px-3 pb-2 sm:px-4" : "px-4 pb-3 sm:px-6"}`}>
-          <StaffNav compact={compact} />
+          <StaffNav compact={compact} workflow={bootstrap.staff_workflow} />
         </div>
       </header>
 

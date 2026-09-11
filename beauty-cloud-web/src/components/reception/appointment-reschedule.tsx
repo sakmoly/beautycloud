@@ -16,30 +16,73 @@ function slotTimeLabel(start?: string): string {
   return minute === "00" ? `${displayHour} ${suffix}` : `${displayHour}:${minute} ${suffix}`;
 }
 
+type RescheduleEmployee = { name: string; employee_name: string; isAssigned?: boolean };
+
+function sortEmployees(rows: RescheduleEmployee[]): RescheduleEmployee[] {
+  return [...rows].sort((a, b) => {
+    if (a.isAssigned && !b.isAssigned) return -1;
+    if (!a.isAssigned && b.isAssigned) return 1;
+    return a.employee_name.localeCompare(b.employee_name);
+  });
+}
+
+function employeesFromSlots(
+  slots: AvailabilitySlot[],
+  assignedEmployee?: string,
+  assignedEmployeeName?: string,
+): RescheduleEmployee[] {
+  const byId = new Map<string, RescheduleEmployee>();
+
+  for (const slot of slots) {
+    if (!slot.employee || byId.has(slot.employee)) continue;
+    byId.set(slot.employee, {
+      name: slot.employee,
+      employee_name: slot.employee_name,
+      isAssigned: slot.employee === assignedEmployee,
+    });
+  }
+
+  if (assignedEmployee && !byId.has(assignedEmployee)) {
+    byId.set(assignedEmployee, {
+      name: assignedEmployee,
+      employee_name: assignedEmployeeName || assignedEmployee,
+      isAssigned: true,
+    });
+  }
+
+  return sortEmployees([...byId.values()]);
+}
+
 export function AppointmentRescheduleSection({
   appointment,
   beautyBranch,
   beautyService,
+  serviceName,
+  serviceRow,
   appointmentDate,
   employee,
-  employees = [],
+  employeeName,
   disabled = false,
   onUpdated,
 }: {
   appointment: string;
   beautyBranch?: string;
   beautyService?: string;
+  serviceName?: string;
+  serviceRow?: number;
   appointmentDate?: string;
   employee?: string;
-  employees?: Array<{ name: string; employee_name: string }>;
+  employeeName?: string;
   disabled?: boolean;
   onUpdated?: (newStartTime?: string) => void;
 }) {
   const initialDate = appointmentDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(initialDate);
   const [selectedEmployee, setSelectedEmployee] = useState(employee ?? "");
+  const [employees, setEmployees] = useState<RescheduleEmployee[]>([]);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,9 +93,66 @@ export function AppointmentRescheduleSection({
     setSelectedEmployee(employee ?? "");
     setSelectedSlot(null);
     setSlots([]);
+    setEmployees([]);
     setError(null);
     setSavedAt(null);
   }, [appointment, initialDate, employee]);
+
+  useEffect(() => {
+    if (!beautyBranch || !beautyService || !date) {
+      setEmployees([]);
+      return;
+    }
+
+    const branch: string = beautyBranch;
+    const service: string = beautyService;
+    let cancelled = false;
+    async function loadBeauticians() {
+      setLoadingEmployees(true);
+      setError(null);
+      try {
+        const rows = await getSlots({
+          beauty_branch: branch,
+          appointment_date: date,
+          services: [service],
+          booking_channel: "reception",
+        });
+        if (cancelled) return;
+
+        const nextEmployees = employeesFromSlots(rows, employee, employeeName);
+        setEmployees(nextEmployees);
+
+        setSelectedEmployee((current) => {
+          if (current && nextEmployees.some((row) => row.name === current)) {
+            return current;
+          }
+          if (employee && nextEmployees.some((row) => row.name === employee)) {
+            return employee;
+          }
+          return nextEmployees[0]?.name ?? "";
+        });
+        setSelectedSlot(null);
+        setSlots([]);
+
+        if (nextEmployees.length === 0) {
+          setError("No beauticians are available on this date. Try another day.");
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setEmployees([]);
+        setError(e instanceof Error ? e.message : "Could not load available beauticians.");
+      } finally {
+        if (!cancelled) {
+          setLoadingEmployees(false);
+        }
+      }
+    }
+
+    void loadBeauticians();
+    return () => {
+      cancelled = true;
+    };
+  }, [beautyBranch, beautyService, date, employee, employeeName]);
 
   async function loadSlots() {
     if (!beautyBranch || !beautyService || !date || !selectedEmployee) {
@@ -68,6 +168,7 @@ export function AppointmentRescheduleSection({
         appointment_date: date,
         services: [beautyService],
         employee: selectedEmployee,
+        booking_channel: "reception",
       });
       setSlots(rows);
       if (rows.length === 0) {
@@ -90,6 +191,7 @@ export function AppointmentRescheduleSection({
         name: appointment,
         start_time: selectedSlot.start_time,
         employee: selectedEmployee,
+        service_row: serviceRow,
       });
       setSavedAt(selectedSlot.start_time);
       onUpdated?.(selectedSlot.start_time);
@@ -120,7 +222,9 @@ export function AppointmentRescheduleSection({
         Reschedule
       </p>
       <p className="mt-1 text-sm text-[color:var(--bc-muted)]">
-        Pick a new date, beautician, and available time slot.
+        {serviceName
+          ? `Move ${serviceName} to a new date, beautician, and time slot.`
+          : "Pick a new date, beautician, and available time slot."}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -145,24 +249,21 @@ export function AppointmentRescheduleSection({
             id={`reschedule-employee-${appointment}`}
             className="mt-1 min-h-11 w-full rounded-xl border border-[color:var(--bc-border)] bg-white px-3"
             value={selectedEmployee}
-            disabled={disabled || busy}
+            disabled={disabled || busy || loadingEmployees || employees.length === 0}
             onChange={(e) => {
               setSelectedEmployee(e.target.value);
               setSelectedSlot(null);
               setSlots([]);
             }}
           >
-            <option value="">Select beautician</option>
+            <option value="">
+              {loadingEmployees ? "Loading beauticians…" : "Select beautician"}
+            </option>
             {employees.map((emp) => (
               <option key={emp.name} value={emp.name}>
-                {emp.employee_name}
+                {emp.isAssigned ? `${emp.employee_name} (assigned)` : emp.employee_name}
               </option>
             ))}
-            {selectedEmployee &&
-            !employees.some((emp) => emp.name === selectedEmployee) &&
-            employee ? (
-              <option value={employee}>{employee}</option>
-            ) : null}
           </select>
         </div>
       </div>
@@ -171,7 +272,9 @@ export function AppointmentRescheduleSection({
         <Button
           type="button"
           variant="secondary"
-          disabled={disabled || busy || loadingSlots || !date || !selectedEmployee}
+          disabled={
+            disabled || busy || loadingSlots || loadingEmployees || !date || !selectedEmployee
+          }
           onClick={loadSlots}
         >
           {loadingSlots ? "Loading times…" : "Show available times"}

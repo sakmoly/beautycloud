@@ -126,6 +126,10 @@
   {
    "read": 1,
    "role": "Beauty Cloud Cashier"
+  },
+  {
+   "read": 1,
+   "role": "Beauty Cloud Receptionist"
   }
  ],
  "sort_field": "modified",

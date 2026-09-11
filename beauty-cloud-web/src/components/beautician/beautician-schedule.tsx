@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import {
   callBeautyMethod,
+  fetchBootstrap,
   getBeauticianMe,
   getBeauticianSchedule,
 } from "@/lib/api/browser-client";
@@ -25,6 +26,9 @@ export function BeauticianScheduleView() {
   const [today, setToday] = useState<BeauticianScheduleLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [requireCheckInBeforeService, setRequireCheckInBeforeService] = useState(true);
+  const [requireInvoiceBeforeService, setRequireInvoiceBeforeService] = useState(true);
+  const [canStartService, setCanStartService] = useState(false);
 
   async function loadSchedule(employee?: string) {
     setLoading(true);
@@ -41,9 +45,24 @@ export function BeauticianScheduleView() {
   }
 
   useEffect(() => {
-    getBeauticianMe()
-      .then((profile) => {
+    Promise.all([getBeauticianMe(), fetchBootstrap()])
+      .then(([profile, bootstrap]) => {
         setMe(profile);
+        setCanStartService(Boolean(profile.workflow?.can_start_service ?? bootstrap.staff_workflow?.can_start_service));
+        setRequireCheckInBeforeService(
+          Boolean(
+            profile.workflow?.require_check_in_before_service ??
+              bootstrap.salon_payment?.require_check_in_before_service ??
+              true,
+          ),
+        );
+        setRequireInvoiceBeforeService(
+          Boolean(
+            profile.workflow?.require_invoice_before_service ??
+              bootstrap.salon_payment?.require_invoice_before_service ??
+              true,
+          ),
+        );
         if (profile.employee) {
           setEmployeeFilter(profile.employee);
           return loadSchedule(profile.employee);
@@ -70,6 +89,21 @@ export function BeauticianScheduleView() {
       body: { name: appointment, service_row: line.service_row ?? line.name },
     });
     await loadSchedule(employeeFilter || undefined);
+  }
+
+  function canStartLine(line: BeauticianScheduleLine): boolean {
+    if (!canStartService) return false;
+    const apptStatus = line.appointment_status ?? "";
+    const startStatuses = requireCheckInBeforeService
+      ? ["Checked In", "Waiting"]
+      : ["Booked", "Confirmed", "Checked In", "Waiting"];
+    const invoiceReady = !requireInvoiceBeforeService || Boolean(line.has_invoice);
+    return (
+      invoiceReady &&
+      startStatuses.includes(apptStatus) &&
+      line.line_status !== "Completed" &&
+      line.line_status !== "In Service"
+    );
   }
 
   async function completeService(line: BeauticianScheduleLine) {
@@ -142,10 +176,21 @@ export function BeauticianScheduleView() {
                     <Button variant="secondary">Open</Button>
                   </Link>
                 ) : null}
-                {line.line_status !== "Completed" && line.line_status !== "In Service" ? (
+                {canStartLine(line) ? (
                   <Button variant="ghost" onClick={() => startService(line)}>
                     Start
                   </Button>
+                ) : null}
+                {!canStartLine(line) &&
+                requireCheckInBeforeService &&
+                ["Booked", "Confirmed"].includes(line.appointment_status ?? "") ? (
+                  <span className="text-xs text-[color:var(--bc-muted)]">Awaiting check-in</span>
+                ) : null}
+                {!canStartLine(line) &&
+                requireInvoiceBeforeService &&
+                !line.has_invoice &&
+                ["Checked In", "Waiting"].includes(line.appointment_status ?? "") ? (
+                  <span className="text-xs text-[color:var(--bc-muted)]">Awaiting salon invoice</span>
                 ) : null}
                 {line.line_status === "In Service" ? (
                   <Button onClick={() => completeService(line)}>Complete</Button>

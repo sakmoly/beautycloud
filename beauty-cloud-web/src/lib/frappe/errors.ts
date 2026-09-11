@@ -1,3 +1,4 @@
+import { formatUserMessage } from "@/lib/format-user-message";
 import type { FrappeErrorPayload } from "./types";
 
 export class FrappeApiError extends Error {
@@ -39,7 +40,7 @@ export function parseFrappeError(
     }
   }
 
-  return new FrappeApiError(message, { excType: payload.exc_type, status });
+  return new FrappeApiError(formatUserMessage(message), { excType: payload.exc_type, status });
 }
 
 export function toClientError(error: unknown) {

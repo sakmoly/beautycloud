@@ -143,34 +143,29 @@ has_permission = {
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Employee": {
+		"on_update": "beauty_cloud.services.hr_schedule.on_employee_update",
+	},
+	"Beauty Employee Schedule": {
+		"after_insert": "beauty_cloud.services.hr_schedule.on_beauty_employee_schedule_change",
+		"on_update": "beauty_cloud.services.hr_schedule.on_beauty_employee_schedule_change",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"beauty_cloud.tasks.all"
-# 	],
-# 	"daily": [
-# 		"beauty_cloud.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"beauty_cloud.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"beauty_cloud.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"beauty_cloud.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [
+			"beauty_cloud.services.draft_booking_cleanup.release_expired_unpaid_draft_bookings",
+		],
+		"0 2 * * *": [
+			"beauty_cloud.services.hr_schedule.maintain_hr_shift_horizon",
+		],
+	},
+}
 
 # Testing
 # -------

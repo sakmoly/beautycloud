@@ -3,8 +3,9 @@
 import Link from "next/link";
 
 import type { BeautyBranch } from "@/lib/api/types";
-import type { PublicCatalogService } from "@/lib/frappe/types";
+import type { PublicCatalogService, VatBootstrapSettings } from "@/lib/frappe/types";
 import { withBasePath } from "@/lib/base-path";
+import { splitVatAmount } from "@/lib/vat";
 
 function formatDuration(minutes?: number) {
   if (!minutes) return null;
@@ -28,6 +29,7 @@ export function BookingTicketSidebar({
   continueLabel = "Continue",
   continueDisabled = false,
   showContinue = false,
+  vat,
 }: {
   branch?: BeautyBranch | null;
   branchLabel?: string;
@@ -42,9 +44,17 @@ export function BookingTicketSidebar({
   continueLabel?: string;
   continueDisabled?: boolean;
   showContinue?: boolean;
+  vat?: VatBootstrapSettings;
 }) {
   const name = branch?.branch_name ?? branchLabel ?? "Your salon";
   const address = branch?.address ?? branchAddress ?? "";
+  const vatEnabled = Boolean(vat?.enabled);
+  const vatPercent = vat?.vat_percent ?? 15;
+  const pricesIncludeVat = vat?.prices_include_vat !== false;
+  const totals =
+    selectedServices.length > 0 && vatEnabled
+      ? splitVatAmount(totalPrice, vatPercent, pricesIncludeVat)
+      : null;
 
   return (
     <aside className="bc-booking-ticket lg:sticky lg:top-0 lg:min-h-full lg:border-l lg:border-[color:var(--bc-border)]">
@@ -110,17 +120,39 @@ export function BookingTicketSidebar({
       </div>
       <div className="bc-booking-ticket-edge" aria-hidden />
       <div className="bc-booking-ticket-footer">
-        <div className="flex items-center justify-between gap-4">
-          <span className="font-semibold">Total</span>
-          <span className="text-lg font-bold">
-            {selectedServices.length === 0
-              ? "Free"
-              : `${currency} ${totalPrice}`}
-          </span>
-        </div>
+        {totals ? (
+          <div className="bc-booking-ticket-vat space-y-1.5 text-sm">
+            <div className="flex items-center justify-between gap-4 text-[color:var(--bc-muted)]">
+              <span>Subtotal (excl. VAT)</span>
+              <span>
+                {currency} {totals.netAmount.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-[color:var(--bc-muted)]">
+              <span>VAT {vatPercent}%</span>
+              <span>
+                {currency} {totals.vatAmount.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-[color:var(--bc-border)] pt-2">
+              <span className="font-semibold">Total (incl. VAT)</span>
+              <span className="text-lg font-bold">
+                {currency} {totals.totalAmount.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            <span className="font-semibold">Total</span>
+            <span className="text-lg font-bold">
+              {selectedServices.length === 0 ? "Free" : `${currency} ${totalPrice}`}
+            </span>
+          </div>
+        )}
         {selectedServices.length > 0 && totalDuration > 0 ? (
           <p className="mt-1 text-xs text-[color:var(--bc-muted)]">
             Estimated duration · {formatDuration(totalDuration)}
+            {vatEnabled && pricesIncludeVat ? " · Prices include VAT" : ""}
           </p>
         ) : null}
         {showContinue && onContinue ? (

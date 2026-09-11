@@ -379,6 +379,18 @@ export function AdminBrandingView({
                   : "—"
               }
             />
+            <InfoRow
+              label="Unpaid draft auto-cancel"
+              value={
+                initialBootstrap.unpaid_draft_hold?.auto_cancel_unpaid_draft_bookings ? (
+                  <Badge tone="warning">
+                    After {initialBootstrap.unpaid_draft_hold.unpaid_draft_hold_minutes ?? 15} min
+                  </Badge>
+                ) : (
+                  <Badge tone="muted">Manual cleanup</Badge>
+                )
+              }
+            />
           </dl>
           <div className="mt-5">
             <a href={deskUrl(frappeBaseUrl, DESK_PATHS.settings)} target="_blank" rel="noopener noreferrer">

@@ -5,7 +5,18 @@
  "engine": "InnoDB",
  "field_order": [
   "company",
+  "setup_complete",
+  "setup_completed_at",
+  "setup_completed_by",
   "invoice_posting_type",
+  "section_break_vat",
+  "enable_vat",
+  "prices_include_vat",
+  "vat_percent",
+  "column_break_vat",
+  "vat_account",
+  "sales_taxes_template",
+  "vat_note",
   "column_break_1",
   "enable_sms",
   "enable_email_otp",
@@ -21,7 +32,25 @@
   "section_break_salon_payment",
   "require_payment_before_service",
   "require_payment_at_kiosk",
+  "require_payment_for_check_in",
   "require_qr_for_check_in",
+  "require_id_for_check_in",
+  "require_check_in_before_service",
+  "require_invoice_before_service",
+  "section_break_unpaid_draft",
+  "auto_cancel_unpaid_draft_bookings",
+  "unpaid_draft_hold_minutes",
+  "unpaid_draft_note",
+  "section_break_hr_schedule",
+  "enable_hr_schedule",
+  "hr_schedule_mode",
+  "column_break_hr",
+  "block_booking_on_leave",
+  "block_booking_on_holidays",
+  "hr_use_default_shift",
+  "auto_sync_hr_shifts",
+  "hr_sync_days_ahead",
+  "hr_schedule_note",
   "section_break_payments",
   "allowed_payment_methods",
   "section_break_telr",
@@ -43,6 +72,26 @@
    "reqd": 1
   },
   {
+   "default": "0",
+   "fieldname": "setup_complete",
+   "fieldtype": "Check",
+   "label": "Setup Complete",
+   "read_only": 1
+  },
+  {
+   "fieldname": "setup_completed_at",
+   "fieldtype": "Datetime",
+   "label": "Setup Completed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "setup_completed_by",
+   "fieldtype": "Link",
+   "label": "Setup Completed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
    "default": "Sales Invoice",
    "description": "Choose whether checkout creates Sales Invoice or POS Invoice. ZATCA/e-invoicing behaviour is configured in ZATCA settings when that app is installed.",
    "fieldname": "invoice_posting_type",
@@ -50,6 +99,57 @@
    "label": "Invoice Posting Type",
    "options": "Sales Invoice\nPOS Invoice",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_vat",
+   "fieldtype": "Section Break",
+   "label": "VAT / Tax"
+  },
+  {
+   "default": "1",
+   "description": "Apply Saudi VAT on POS and booking invoices.",
+   "fieldname": "enable_vat",
+   "fieldtype": "Check",
+   "label": "Enable VAT on Invoices"
+  },
+  {
+   "default": "1",
+   "description": "When checked, service prices in Beauty Cloud are treated as VAT-inclusive (typical for Saudi retail). Uncheck if prices are entered excluding VAT.",
+   "fieldname": "prices_include_vat",
+   "fieldtype": "Check",
+   "label": "Prices Include VAT"
+  },
+  {
+   "default": "15",
+   "fieldname": "vat_percent",
+   "fieldtype": "Float",
+   "label": "VAT %",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_vat",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Output VAT account used on sales invoices. Auto-detected on setup if blank.",
+   "fieldname": "vat_account",
+   "fieldtype": "Link",
+   "label": "VAT Account",
+   "options": "Account"
+  },
+  {
+   "description": "ERPNext sales tax template applied to Beauty Cloud invoices.",
+   "fieldname": "sales_taxes_template",
+   "fieldtype": "Link",
+   "label": "Sales Taxes Template",
+   "options": "Sales Taxes and Charges Template",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vat_note",
+   "fieldtype": "Small Text",
+   "label": "VAT Note",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_1",
@@ -150,10 +250,134 @@
   },
   {
    "default": "1",
-   "description": "When enabled, reception and beauticians must scan the customer's appointment QR code before check-in. Prevents checking in the wrong guest by mistake.",
+   "description": "When enabled, the guest must be paid (or deposit paid) before reception can check them in.",
+   "fieldname": "require_payment_for_check_in",
+   "fieldtype": "Check",
+   "label": "Require Payment Before Check-in"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, reception must scan the customer's booking QR code before check-in.",
    "fieldname": "require_qr_for_check_in",
    "fieldtype": "Check",
    "label": "Require QR Scan for Check-in"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, reception must enter and verify the appointment ID (e.g. BAPT-2026-00038) before check-in. Use this instead of QR when QR scan is off.",
+   "fieldname": "require_id_for_check_in",
+   "fieldtype": "Check",
+   "label": "Require Appointment ID for Check-in"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, reception must check in the guest before a beautician can start the service. Check-in is limited to reception; starting is limited to beauticians.",
+   "fieldname": "require_check_in_before_service",
+   "fieldtype": "Check",
+   "label": "Require Check-in Before Service"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, reception must issue the salon invoice at POS after check-in. Beauticians cannot start until the invoice exists.",
+   "fieldname": "require_invoice_before_service",
+   "fieldtype": "Check",
+   "label": "Require POS Invoice Before Service"
+  },
+  {
+   "fieldname": "section_break_unpaid_draft",
+   "fieldtype": "Section Break",
+   "label": "Unpaid Draft Bookings"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, unpaid Online and Kiosk draft appointments are automatically cancelled after the hold period below so the time slot becomes available again.",
+   "fieldname": "auto_cancel_unpaid_draft_bookings",
+   "fieldtype": "Check",
+   "label": "Auto-cancel Unpaid Draft Bookings"
+  },
+  {
+   "default": "15",
+   "depends_on": "eval:doc.auto_cancel_unpaid_draft_bookings",
+   "description": "How long to hold the slot while the guest completes payment. After this time the draft booking is cancelled and the slot is released.",
+   "fieldname": "unpaid_draft_hold_minutes",
+   "fieldtype": "Int",
+   "label": "Unpaid Draft Hold (Minutes)"
+  },
+  {
+   "depends_on": "eval:doc.auto_cancel_unpaid_draft_bookings",
+   "fieldname": "unpaid_draft_note",
+   "fieldtype": "Small Text",
+   "label": "Unpaid Draft Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_hr_schedule",
+   "fieldtype": "Section Break",
+   "label": "HR Schedule Integration"
+  },
+  {
+   "default": "1",
+   "description": "Use Frappe HR shifts, leave, and holidays when calculating bookable beautician times.",
+   "fieldname": "enable_hr_schedule",
+   "fieldtype": "Check",
+   "label": "Enable HR Schedule Integration"
+  },
+  {
+   "default": "HR Primary",
+   "depends_on": "eval:doc.enable_hr_schedule",
+   "fieldname": "hr_schedule_mode",
+   "fieldtype": "Select",
+   "label": "Schedule Source Priority",
+   "options": "HR Primary\nBeauty Schedule Primary\nIntersect Both"
+  },
+  {
+   "fieldname": "column_break_hr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_hr_schedule",
+   "fieldname": "block_booking_on_leave",
+   "fieldtype": "Check",
+   "label": "Block Booking on Approved Leave"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_hr_schedule",
+   "fieldname": "block_booking_on_holidays",
+   "fieldtype": "Check",
+   "label": "Block Booking on Branch Holidays"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_hr_schedule",
+   "description": "When no Shift Assignment exists, fall back to the Employee default shift from HR.",
+   "fieldname": "hr_use_default_shift",
+   "fieldtype": "Check",
+   "label": "Use Employee Default Shift"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_hr_schedule",
+   "description": "When a Beauty Employee Schedule is saved in back office, HR Shift Assignments are created or updated automatically.",
+   "fieldname": "auto_sync_hr_shifts",
+   "fieldtype": "Check",
+   "label": "Auto-sync Beauty Schedules to HR Shifts"
+  },
+  {
+   "default": "90",
+   "depends_on": "eval:doc.enable_hr_schedule && doc.auto_sync_hr_shifts",
+   "description": "How many days ahead to maintain HR Shift Assignments from weekly Beauty Employee Schedules.",
+   "fieldname": "hr_sync_days_ahead",
+   "fieldtype": "Int",
+   "label": "HR Sync Horizon (Days)"
+  },
+  {
+   "depends_on": "eval:doc.enable_hr_schedule",
+   "fieldname": "hr_schedule_note",
+   "fieldtype": "Small Text",
+   "label": "HR Schedule Note",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_payments",

@@ -41,7 +41,10 @@ export type PosRegisterRow = {
 
 export type PosSessionContext = {
   beauty_branch?: string;
+  branch_name?: string;
   can_manage_business_day?: boolean;
+  can_open_business_day?: boolean;
+  can_close_business_day?: boolean;
   can_unpair_register?: boolean;
   enforce_business_day?: boolean;
   enforce_register_session?: boolean;
@@ -50,9 +53,11 @@ export type PosSessionContext = {
   business_day?: PosBusinessDaySummary | null;
   suggested_business_date?: string;
   register?: { name?: string; register_code?: string; register_name?: string } | null;
+  register_pairing_error?: string | null;
   register_session?: PosRegisterSessionSummary | null;
   open_registers?: PosRegisterSessionSummary[];
   closed_registers?: PosRegisterSessionSummary[];
   recent_business_days?: PosBusinessDaySummary[];
   available_registers?: PosRegisterRow[];
+  can_fetch_pairing_key?: boolean;
 };

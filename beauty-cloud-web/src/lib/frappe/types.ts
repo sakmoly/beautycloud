@@ -231,7 +231,33 @@ export interface BookingPaymentSettings {
 export interface SalonPaymentSettings {
   require_payment_before_service?: boolean;
   require_payment_at_kiosk?: boolean;
+  require_payment_for_check_in?: boolean;
   require_qr_for_check_in?: boolean;
+  require_id_for_check_in?: boolean;
+  require_check_in_before_service?: boolean;
+  require_invoice_before_service?: boolean;
+}
+
+export interface StaffWorkflowCapabilities {
+  can_check_in?: boolean;
+  can_start_service?: boolean;
+  can_complete_service?: boolean;
+  require_check_in_before_service?: boolean;
+  require_invoice_before_service?: boolean;
+  roles?: string[];
+  default_branch?: string | null;
+  branch_scope?: string[] | null;
+}
+
+export interface UnpaidDraftHoldSettings {
+  auto_cancel_unpaid_draft_bookings?: boolean;
+  unpaid_draft_hold_minutes?: number;
+}
+
+export interface VatBootstrapSettings {
+  enabled?: boolean;
+  prices_include_vat?: boolean;
+  vat_percent?: number;
 }
 
 export interface PublicBootstrap {
@@ -239,6 +265,7 @@ export interface PublicBootstrap {
   company: string;
   company_display_name?: string;
   invoice_posting_type?: string;
+  vat?: VatBootstrapSettings;
   sms_enabled?: boolean;
   email_enabled?: boolean;
   send_booking_confirmation_email?: boolean;
@@ -247,6 +274,8 @@ export interface PublicBootstrap {
   payment_methods?: PaymentMethodsByChannel;
   booking_payment?: BookingPaymentSettings;
   salon_payment?: SalonPaymentSettings;
+  staff_workflow?: StaffWorkflowCapabilities;
+  unpaid_draft_hold?: UnpaidDraftHoldSettings;
   branding?: Branding;
   navigation?: WebNavItem[];
   footer_navigation?: WebNavItem[];
@@ -273,7 +302,17 @@ export interface BookingPaymentSession {
     expiry: string;
     cvv: string;
   };
+  payment_label?: string;
   name?: string;
+}
+
+export interface KioskPaymentConfig {
+  require_payment?: boolean;
+  label?: string;
+  gateway?: string;
+  enable_telr?: boolean;
+  telr_demo_mode?: boolean;
+  currency?: string;
 }
 
 export interface FrappeErrorPayload {

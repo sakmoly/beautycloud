@@ -55,6 +55,28 @@ def checkout(cart: dict) -> dict:
 	settings = frappe.get_single("Beauty Cloud Settings")
 	company = validated.get("company") or settings.company
 
+	if cart.get("prepaid_invoice"):
+		appt_name = validated.get("beauty_appointment")
+		if not appt_name:
+			frappe.throw(_("Appointment is required for prepaid invoicing"))
+		from beauty_cloud.services.invoice_gate import (
+			assert_no_duplicate_invoice,
+			get_prepaid_checkout_payments,
+		)
+		from beauty_cloud.services.payment_gate import is_appointment_paid
+
+		appt = frappe.get_doc("Beauty Appointment", appt_name)
+		if not is_appointment_paid(appt.payment_status):
+			frappe.throw(_("Appointment {0} is not paid yet").format(appt_name))
+		assert_no_duplicate_invoice(appt_name)
+		validated["payments"] = get_prepaid_checkout_payments(appt_name, validated["grand_total"])
+		validated["paid_amount"] = validated["grand_total"]
+		validated["outstanding_amount"] = 0
+	elif validated.get("beauty_appointment"):
+		from beauty_cloud.services.invoice_gate import assert_no_duplicate_invoice
+
+		assert_no_duplicate_invoice(validated["beauty_appointment"])
+
 	if validated["outstanding_amount"] > 0 and not cart.get("allow_partial"):
 		frappe.throw(
 			_("Outstanding amount {0} must be settled").format(validated["outstanding_amount"])
@@ -63,6 +85,7 @@ def checkout(cart: dict) -> dict:
 	from beauty_cloud.services.register_session import resolve_checkout_session
 
 	session = resolve_checkout_session(validated | cart)
+	acting_user = session.get("cashier") or frappe.session.user
 
 	tx = frappe.get_doc(
 		{
@@ -91,7 +114,7 @@ def checkout(cart: dict) -> dict:
 	_apply_wallet_redemption(validated)
 	_apply_gift_card_redemption(validated)
 
-	invoice = _create_invoice(tx, settings)
+	invoice = _create_invoice(tx, settings, acting_user=acting_user)
 	tx.db_set(
 		{
 			"invoice_doctype": invoice.doctype,
@@ -104,7 +127,7 @@ def checkout(cart: dict) -> dict:
 		}
 	)
 
-	_create_payment_entries(tx, invoice, validated.get("payments") or [])
+	_create_payment_entries(tx, invoice, validated.get("payments") or [], acting_user=acting_user)
 
 	if tx.beauty_appointment:
 		appt_payment_status = _appointment_payment_status(validated)
@@ -142,6 +165,10 @@ def load_appointment_for_pos(name: str) -> dict:
 			}
 		)
 
+	from beauty_cloud.services.invoice_gate import get_invoice_flags_for_appointment
+
+	invoice_flags = get_invoice_flags_for_appointment(doc)
+
 	return {
 		"beauty_appointment": doc.name,
 		"customer": doc.customer,
@@ -151,7 +178,37 @@ def load_appointment_for_pos(name: str) -> dict:
 		"payment_status": doc.payment_status,
 		"total_amount": flt(doc.total_amount),
 		"items": items,
+		**invoice_flags,
 	}
+
+
+def issue_appointment_invoice(appointment_name: str, cart: dict | None = None) -> dict:
+	"""Issue salon invoice at POS after check-in (collect payment or prepaid)."""
+	cart = frappe._dict(cart or {})
+	appt = frappe.get_doc("Beauty Appointment", appointment_name)
+	appt.check_permission("write")
+
+	from beauty_cloud.services.invoice_gate import get_appointment_invoice_info
+	from beauty_cloud.services.payment_gate import is_appointment_paid
+
+	existing = get_appointment_invoice_info(appointment_name)
+	if existing["has_invoice"]:
+		return frappe.get_doc("Beauty POS Transaction", existing["pos_transaction"]).as_dict()
+
+	payload = load_appointment_for_pos(appointment_name)
+	payload.update(cart)
+	payload["beauty_appointment"] = appointment_name
+	payload["source"] = payload.get("source") or "Reception"
+
+	if is_appointment_paid(appt.payment_status):
+		payload["prepaid_invoice"] = 1
+	elif not payload.get("payments"):
+		frappe.throw(
+			_("Collect payment at POS to issue the salon invoice."),
+			title=_("Payment Required"),
+		)
+
+	return checkout(payload)
 
 
 def refund_transaction(name: str, amount: float | None = None, reason: str | None = None) -> dict:
@@ -284,7 +341,11 @@ def _resolve_service_item(beauty_service: str) -> tuple[str | None, str | None]:
 	return None, linked.service_name if linked else beauty_service
 
 
-def _create_invoice(tx, settings):
+def _create_invoice(tx, settings, acting_user: str | None = None):
+	from beauty_cloud.services.accounting_permissions import elevated_accounting, stamp_document_owner
+	from beauty_cloud.services.vat import apply_sales_taxes
+
+	acting_user = acting_user or tx.cashier or frappe.session.user
 	branch = frappe.get_doc("Beauty Branch", tx.beauty_branch)
 	invoice_items = []
 	for row in tx.items:
@@ -325,17 +386,24 @@ def _create_invoice(tx, settings):
 			}
 		)
 
-	inv.insert(ignore_permissions=True)
-	inv.submit()
+	with elevated_accounting(acting_user):
+		apply_sales_taxes(inv, settings)
+		inv.insert(ignore_permissions=True)
+		_submit_accounting_doc(inv)
+
+	stamp_document_owner(inv.doctype, inv.name, acting_user)
 	return inv
 
 
-def _create_payment_entries(tx, invoice, payments: list[dict]):
+def _create_payment_entries(tx, invoice, payments: list[dict], acting_user: str | None = None):
 	if not payments:
 		return
 
 	from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
+	from beauty_cloud.services.accounting_permissions import elevated_accounting, stamp_document_owner
+
+	acting_user = acting_user or tx.cashier or frappe.session.user
 	company_currency = frappe.get_cached_value("Company", tx.company, "default_currency")
 	allocated = 0
 	for idx, payment in enumerate(payments):
@@ -345,57 +413,69 @@ def _create_payment_entries(tx, invoice, payments: list[dict]):
 
 		mode = payment.get("mode_of_payment") or "Cash"
 
-		pe = get_payment_entry(
-			invoice.doctype,
-			invoice.name,
-			party_amount=min(amount, flt(invoice.grand_total) - allocated),
-		)
-		pe.mode_of_payment = mode
-
-		cash_account = _resolve_payment_account(tx.company, mode)
-		if not cash_account:
-			frappe.throw(_("No ledger account configured for payment mode {0}").format(mode))
-
-		pe.paid_to = cash_account
-		pe.paid_to_account_currency = (
-			frappe.db.get_value("Account", cash_account, "account_currency") or company_currency
-		)
-		pe.paid_to_account_type = frappe.db.get_value("Account", cash_account, "account_type")
-
-		if pe.paid_from and not pe.paid_from_account_currency:
-			pe.paid_from_account_currency = (
-				frappe.db.get_value("Account", pe.paid_from, "account_currency") or company_currency
+		with elevated_accounting(acting_user):
+			pe = get_payment_entry(
+				invoice.doctype,
+				invoice.name,
+				party_amount=min(amount, flt(invoice.grand_total) - allocated),
 			)
-		if pe.paid_from and not pe.paid_from_account_type:
-			pe.paid_from_account_type = frappe.db.get_value("Account", pe.paid_from, "account_type")
+			pe.mode_of_payment = mode
 
-		pe.paid_amount = amount
-		pe.received_amount = amount
-		pe.reference_no = tx.name
-		pe.reference_date = tx.posting_date
+			cash_account = _resolve_payment_account(tx.company, mode)
+			if not cash_account:
+				frappe.throw(_("No ledger account configured for payment mode {0}").format(mode))
 
-		# ERPNext requires both rates before submit; force 1 for single-currency SAR.
-		if pe.paid_from_account_currency == company_currency:
-			pe.source_exchange_rate = 1
-		if pe.paid_to_account_currency == company_currency:
-			pe.target_exchange_rate = 1
-		if pe.paid_from_account_currency == pe.paid_to_account_currency:
-			rate = flt(pe.source_exchange_rate) or flt(pe.target_exchange_rate) or 1
-			pe.source_exchange_rate = rate
-			pe.target_exchange_rate = rate
-		else:
-			pe.set_exchange_rate(invoice)
-			pe.source_exchange_rate = flt(pe.source_exchange_rate) or 1
-			pe.target_exchange_rate = flt(pe.target_exchange_rate) or 1
+			pe.paid_to = cash_account
+			pe.paid_to_account_currency = _account_field(cash_account, "account_currency") or company_currency
+			pe.paid_to_account_type = _account_field(cash_account, "account_type")
 
-		pe.set_amounts()
-		pe.set_amounts_in_company_currency()
-		pe.insert(ignore_permissions=True)
-		pe.submit()
+			if pe.paid_from and not pe.paid_from_account_currency:
+				pe.paid_from_account_currency = (
+					_account_field(pe.paid_from, "account_currency") or company_currency
+				)
+			if pe.paid_from and not pe.paid_from_account_type:
+				pe.paid_from_account_type = _account_field(pe.paid_from, "account_type")
+
+			pe.paid_amount = amount
+			pe.received_amount = amount
+			pe.reference_no = tx.name
+			pe.reference_date = tx.posting_date
+
+			# ERPNext requires both rates before submit; force 1 for single-currency SAR.
+			if pe.paid_from_account_currency == company_currency:
+				pe.source_exchange_rate = 1
+			if pe.paid_to_account_currency == company_currency:
+				pe.target_exchange_rate = 1
+			if pe.paid_from_account_currency == pe.paid_to_account_currency:
+				rate = flt(pe.source_exchange_rate) or flt(pe.target_exchange_rate) or 1
+				pe.source_exchange_rate = rate
+				pe.target_exchange_rate = rate
+			else:
+				pe.set_exchange_rate(invoice)
+				pe.source_exchange_rate = flt(pe.source_exchange_rate) or 1
+				pe.target_exchange_rate = flt(pe.target_exchange_rate) or 1
+
+			pe.set_amounts()
+			pe.set_amounts_in_company_currency()
+			pe.insert(ignore_permissions=True)
+			_submit_accounting_doc(pe)
+
+		stamp_document_owner(pe.doctype, pe.name, acting_user)
 		if tx.payments and idx < len(tx.payments):
 			tx.payments[idx].payment_entry = pe.name
 		allocated += amount
 	tx.save(ignore_permissions=True)
+
+
+def _account_field(account_name: str | None, fieldname: str):
+	if not account_name:
+		return None
+	return frappe.get_cached_value("Account", account_name, fieldname)
+
+
+def _submit_accounting_doc(doc) -> None:
+	doc.flags.ignore_permissions = True
+	doc.submit()
 
 
 def _resolve_payment_account(company: str, mode_of_payment: str) -> str | None:
@@ -410,6 +490,9 @@ def _resolve_payment_account(company: str, mode_of_payment: str) -> str | None:
 
 
 def _create_return_invoice(original, refund_amount: float):
+	from beauty_cloud.services.accounting_permissions import elevated_accounting, stamp_document_owner
+
+	acting_user = original.cashier or frappe.session.user
 	inv = frappe.get_doc(original.invoice_doctype, original.invoice)
 	return_inv = frappe.copy_doc(inv)
 	return_inv.is_return = 1
@@ -425,8 +508,10 @@ def _create_return_invoice(original, refund_amount: float):
 				"warehouse": row.warehouse,
 			},
 		)
-	return_inv.insert(ignore_permissions=True)
-	return_inv.submit()
+	with elevated_accounting(acting_user):
+		return_inv.insert(ignore_permissions=True)
+		_submit_accounting_doc(return_inv)
+	stamp_document_owner(return_inv.doctype, return_inv.name, acting_user)
 	return return_inv
 
 

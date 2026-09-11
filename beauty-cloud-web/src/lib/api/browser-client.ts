@@ -23,11 +23,12 @@ import type {
 } from "@/lib/api/types";
 import type { PublicBootstrap, PublicServiceCatalog, WebPageContent } from "@/lib/frappe/types";
 import { withBasePath } from "@/lib/base-path";
+import { formatUserMessage } from "@/lib/format-user-message";
 
 async function parseJson<T>(response: Response): Promise<T> {
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error ?? "Request failed");
+    throw new Error(formatUserMessage(payload.error ?? "Request failed"));
   }
   return payload as T;
 }
@@ -220,10 +221,10 @@ export async function getBookingReceipt(appointment: string) {
   return payload.data;
 }
 
-export async function getBranches() {
+export async function getBranches(options?: { staff?: boolean }) {
   return callBeautyMethod<BeautyBranch[]>({
     method: "beauty_cloud.api.bootstrap.get_branches",
-    guest: true,
+    guest: !options?.staff,
   });
 }
 
@@ -239,6 +240,7 @@ export async function getSlots(input: {
   appointment_date: string;
   services: string[];
   employee?: string;
+  booking_channel?: string;
 }) {
   return callBeautyMethod<AvailabilitySlot[]>({
     method: "beauty_cloud.api.availability.get_slots",
@@ -248,6 +250,49 @@ export async function getSlots(input: {
       appointment_date: input.appointment_date,
       services: JSON.stringify(input.services),
       employee: input.employee,
+      booking_channel: input.booking_channel ?? "online",
+    },
+  });
+}
+
+export async function getBookingSchedulePlan(input: {
+  beauty_branch: string;
+  appointment_date: string;
+  services: string[];
+  booking_channel?: string;
+  service_location?: string;
+}) {
+  return callBeautyMethod<import("@/lib/api/types").BookingSchedulePlan>({
+    method: "beauty_cloud.api.availability.get_schedule_plan",
+    guest: true,
+    params: {
+      beauty_branch: input.beauty_branch,
+      appointment_date: input.appointment_date,
+      services: JSON.stringify(input.services),
+      booking_channel: input.booking_channel ?? "online",
+      service_location: input.service_location ?? "Salon",
+    },
+  });
+}
+
+export async function getServiceSlots(input: {
+  beauty_branch: string;
+  appointment_date: string;
+  service: string;
+  employee?: string;
+  booking_channel?: string;
+  service_location?: string;
+}) {
+  return callBeautyMethod<AvailabilitySlot[]>({
+    method: "beauty_cloud.api.availability.get_service_slots",
+    guest: true,
+    params: {
+      beauty_branch: input.beauty_branch,
+      appointment_date: input.appointment_date,
+      service: input.service,
+      employee: input.employee,
+      booking_channel: input.booking_channel ?? "online",
+      service_location: input.service_location ?? "Salon",
     },
   });
 }
@@ -317,6 +362,7 @@ export async function getBeauticianMe() {
     can_select_employee?: boolean;
     employees?: Array<{ name: string; employee_name: string }>;
     user?: string;
+    workflow?: import("@/lib/frappe/types").StaffWorkflowCapabilities;
   }>({
     method: "beauty_cloud.api.beautician.get_me",
   });
@@ -344,6 +390,13 @@ export async function validatePosCart(body: {
 export async function checkoutPosCart(body: Record<string, unknown>) {
   return callBeautyMethod({
     method: "beauty_cloud.api.pos.checkout_cart",
+    body,
+  });
+}
+
+export async function issuePosInvoice(body: Record<string, unknown>) {
+  return callBeautyMethod({
+    method: "beauty_cloud.api.pos.issue_invoice",
     body,
   });
 }
@@ -445,6 +498,13 @@ export async function pairPosRegister(input: {
   });
 }
 
+export async function fetchPosRegisterKey(registerCode: string) {
+  return callBeautyMethod<string>({
+    method: "beauty_cloud.api.register.get_pairing_key",
+    params: { name: registerCode },
+  });
+}
+
 export async function unpairPosRegister(input: { register_code: string; register_api_key: string }) {
   return callBeautyMethod({
     method: "beauty_cloud.api.register.unpair_register_device",
@@ -509,7 +569,16 @@ export async function loadPosAppointment(name: string) {
     customer_name?: string;
     beauty_branch?: string;
     payment_status?: string;
+    status?: string;
+    total_amount?: number;
     items?: PosCartItem[];
+    has_invoice?: boolean;
+    needs_invoice?: boolean;
+    prepaid?: boolean;
+    can_issue_prepaid_invoice?: boolean;
+    invoice?: string;
+    invoice_doctype?: string;
+    pos_transaction?: string;
   }>({
     method: "beauty_cloud.api.pos.load_appointment",
     params: { name },
@@ -545,5 +614,151 @@ export async function kioskBootstrap(device_id: string, api_key: string) {
     method: "beauty_cloud.api.kiosk.bootstrap",
     guest: true,
     params: { device_id, api_key },
+  });
+}
+
+export async function kioskGetCatalog(
+  device_id: string,
+  api_key: string,
+  parent_category?: string,
+) {
+  return callBeautyMethod<import("@/lib/frappe/types").PublicServiceCatalog>({
+    method: "beauty_cloud.api.kiosk.get_catalog",
+    guest: true,
+    params: {
+      device_id,
+      api_key,
+      ...(parent_category ? { parent_category } : {}),
+    },
+  });
+}
+
+export async function kioskGetSlots(input: {
+  device_id: string;
+  api_key: string;
+  appointment_date: string;
+  services: string[];
+  employee?: string;
+  beauty_branch?: string;
+}) {
+  return callBeautyMethod<AvailabilitySlot[]>({
+    method: "beauty_cloud.api.kiosk.get_slots",
+    guest: true,
+    params: {
+      device_id: input.device_id,
+      api_key: input.api_key,
+      appointment_date: input.appointment_date,
+      services: JSON.stringify(input.services),
+      employee: input.employee,
+      beauty_branch: input.beauty_branch,
+    },
+  });
+}
+
+export async function kioskGetBeauticians(
+  device_id: string,
+  api_key: string,
+  services: string[],
+  beauty_branch?: string,
+) {
+  return callBeautyMethod<
+    Array<{ employee: string; employee_name: string; employee_image?: string }>
+  >({
+    method: "beauty_cloud.api.kiosk.get_beauticians",
+    guest: true,
+    params: {
+      device_id,
+      api_key,
+      services: JSON.stringify(services),
+      beauty_branch,
+    },
+  });
+}
+
+export async function kioskGetSchedulePlan(input: {
+  device_id: string;
+  api_key: string;
+  appointment_date: string;
+  services: string[];
+  beauty_branch?: string;
+}) {
+  return callBeautyMethod<import("@/lib/api/types").BookingSchedulePlan>({
+    method: "beauty_cloud.api.kiosk.get_schedule_plan",
+    guest: true,
+    params: {
+      device_id: input.device_id,
+      api_key: input.api_key,
+      appointment_date: input.appointment_date,
+      services: JSON.stringify(input.services),
+      beauty_branch: input.beauty_branch,
+    },
+  });
+}
+
+export interface SetupStepStatus {
+  id: string;
+  label: string;
+  status: "complete" | "pending";
+  message: string;
+  optional?: boolean;
+  count?: number;
+}
+
+export interface SetupStatus {
+  setup_complete: boolean;
+  setup_completed_at?: string;
+  ready: boolean;
+  steps: SetupStepStatus[];
+  company?: string;
+}
+
+export async function getSetupStatus() {
+  return callBeautyMethod<SetupStatus>({
+    method: "beauty_cloud.api.setup.get_status",
+  });
+}
+
+export async function getSetupContext() {
+  return callBeautyMethod<{
+    companies: Array<{ name: string; company_name: string }>;
+    branches: Array<{ name: string; branch_code: string; branch_name: string; is_active?: number }>;
+    settings: { company?: string; setup_complete?: boolean };
+  }>({
+    method: "beauty_cloud.api.setup.get_context",
+  });
+}
+
+export async function saveSetupStep(step_id: string, data: Record<string, unknown>) {
+  return callBeautyMethod<{ step: string; status: SetupStatus }>({
+    method: "beauty_cloud.api.setup.save_step",
+    body: { step_id, data },
+  });
+}
+
+export async function completeSetup() {
+  return callBeautyMethod<SetupStatus>({
+    method: "beauty_cloud.api.setup.complete",
+  });
+}
+
+export async function kioskGetServiceSlots(input: {
+  device_id: string;
+  api_key: string;
+  appointment_date: string;
+  service: string;
+  employee?: string;
+  beauty_branch?: string;
+}) {
+  return callBeautyMethod<AvailabilitySlot[]>({
+    method: "beauty_cloud.api.kiosk.get_service_slots",
+    guest: true,
+    params: {
+      device_id: input.device_id,
+      api_key: input.api_key,
+      appointment_date: input.appointment_date,
+      service: input.service,
+      employee: input.employee,
+      beauty_branch: input.beauty_branch,
+    },
   });
 }

@@ -34,6 +34,60 @@ def calculate_booking_payment_amount(total_amount: float, payment_type: str, dep
 	return total_amount
 
 
+def create_kiosk_payment(appointment_name: str) -> dict:
+	"""Start Telr card payment for a kiosk draft appointment (Mada / Credit Card)."""
+	from beauty_cloud.services.payment_gate import get_salon_payment_settings
+
+	if not get_salon_payment_settings()["require_payment_at_kiosk"]:
+		frappe.throw(_("Kiosk payment is not enabled"))
+
+	settings = get_booking_payment_settings()
+	if not settings["enable_telr"]:
+		frappe.throw(_("Telr payment gateway must be enabled for kiosk card payments"))
+
+	appt = frappe.get_doc("Beauty Appointment", appointment_name)
+	if appt.source != "Kiosk":
+		frappe.throw(_("Invalid appointment source for kiosk payment"))
+	if appt.status not in ("Draft",):
+		frappe.throw(_("Payment can only be initiated for draft appointments"))
+
+	existing = frappe.db.get_value(
+		"Beauty Booking Payment",
+		{"beauty_appointment": appointment_name, "status": "Pending"},
+		"name",
+	)
+	if existing:
+		return get_payment_session(existing, settings, channel="kiosk")
+
+	amount = flt(appt.total_amount)
+	if amount <= 0:
+		frappe.throw(_("Payment amount must be greater than zero"))
+
+	cart_id = f"kiosk-{appointment_name}-{secrets.token_hex(4)}"
+	demo_token = secrets.token_urlsafe(24) if settings["telr_demo_mode"] else None
+
+	payment = frappe.get_doc(
+		{
+			"doctype": "Beauty Booking Payment",
+			"company": appt.company,
+			"beauty_appointment": appt.name,
+			"customer": appt.customer,
+			"status": "Pending",
+			"payment_type": "Full Amount",
+			"gateway": "Demo" if settings["telr_demo_mode"] else "Telr",
+			"amount": amount,
+			"currency": settings["currency"],
+			"appointment_total": appt.total_amount,
+			"cart_id": cart_id,
+			"demo_token": demo_token,
+		}
+	)
+	payment.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	return get_payment_session(payment.name, settings, channel="kiosk")
+
+
 def create_booking_payment(appointment_name: str) -> dict:
 	settings = get_booking_payment_settings()
 	if not settings["require_payment_at_booking"]:
@@ -85,7 +139,11 @@ def create_booking_payment(appointment_name: str) -> dict:
 	return get_payment_session(payment.name, settings)
 
 
-def get_payment_session(payment_name: str, settings: dict | None = None) -> dict:
+def get_payment_session(
+	payment_name: str,
+	settings: dict | None = None,
+	channel: str = "booking",
+) -> dict:
 	settings = settings or get_booking_payment_settings()
 	payment = frappe.get_doc("Beauty Booking Payment", payment_name)
 	appt = frappe.get_doc("Beauty Appointment", payment.beauty_appointment)
@@ -116,13 +174,19 @@ def get_payment_session(payment_name: str, settings: dict | None = None) -> dict
 			"expiry": "Any future date",
 			"cvv": "123",
 		}
+		if channel == "kiosk":
+			result["payment_label"] = "Mada / Credit Card"
 		return result
 
 	if not settings["enable_telr"]:
 		frappe.throw(_("Telr payment gateway is not enabled"))
 
 	telr_settings = _get_telr_credentials()
-	return_urls = _build_return_urls(payment.name)
+	return_urls = (
+		_build_kiosk_return_urls(payment.name)
+		if channel == "kiosk"
+		else _build_return_urls(payment.name)
+	)
 	telr_response = create_telr_order(
 		store_id=telr_settings["store_id"],
 		auth_key=telr_settings["auth_key"],
@@ -150,6 +214,8 @@ def get_payment_session(payment_name: str, settings: dict | None = None) -> dict
 
 	result["payment_url"] = payment_url
 	result["telr_order_ref"] = order_ref
+	if channel == "kiosk":
+		result["payment_label"] = "Mada / Credit Card"
 	return result
 
 
@@ -323,6 +389,15 @@ def _build_return_urls(payment_name: str) -> dict:
 	}
 
 
+def _build_kiosk_return_urls(payment_name: str) -> dict:
+	base = _public_booking_base_url().rstrip("/")
+	return {
+		"success": f"{base}/kiosk/payment/return?payment={payment_name}",
+		"failed": f"{base}/kiosk/payment/return?payment={payment_name}&result=failed",
+		"cancel": f"{base}/kiosk/payment/return?payment={payment_name}&result=cancelled",
+	}
+
+
 def _public_booking_base_url() -> str:
 	tenant = frappe.db.get_value(
 		"Beauty Cloud Tenant",
@@ -331,6 +406,10 @@ def _public_booking_base_url() -> str:
 	)
 	if tenant:
 		return tenant.rstrip("/")
+
+	host = (frappe.local.conf.get("host_name") or "").strip().rstrip("/")
+	if host:
+		return host
 
 	return frappe.utils.get_url().replace("/api", "").rstrip("/")
 

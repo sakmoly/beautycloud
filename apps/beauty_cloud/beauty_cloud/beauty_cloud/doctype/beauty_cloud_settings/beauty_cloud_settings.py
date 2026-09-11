@@ -28,6 +28,46 @@ class BeautyCloudSettings(Document):
 		else:
 			self.telr_note = "Telr gateway is disabled."
 
+		if self.auto_cancel_unpaid_draft_bookings:
+			minutes = int(self.unpaid_draft_hold_minutes or 0)
+			if minutes < 1:
+				frappe.throw(_("Unpaid Draft Hold must be at least 1 minute when auto-cancel is enabled."))
+			if minutes > 480:
+				frappe.throw(_("Unpaid Draft Hold cannot exceed 480 minutes (8 hours)."))
+			self.unpaid_draft_note = (
+				f"Unpaid Online/Kiosk draft bookings are cancelled after {minutes} minutes "
+				"and their time slots are released automatically."
+			)
+		else:
+			self.unpaid_draft_note = (
+				"Unpaid draft bookings stay on the schedule until reception cancels them manually."
+			)
+
+		from beauty_cloud.services.hr_schedule import hrms_available
+
+		if self.enable_hr_schedule and hrms_available():
+			mode = self.hr_schedule_mode or "HR Primary"
+			if self.auto_sync_hr_shifts:
+				horizon = int(self.hr_sync_days_ahead or 90)
+				self.hr_schedule_note = (
+					f"Booking uses Frappe HR with mode '{mode}'. "
+					f"Beauty Employee Schedule changes auto-sync to HR shifts for the next {horizon} days."
+				)
+			else:
+				self.hr_schedule_note = (
+					f"Booking uses Frappe HR with mode '{mode}'. "
+					"Auto-sync is off — run manual HR shift sync after changing weekly beautician hours."
+				)
+		elif self.enable_hr_schedule:
+			self.hr_schedule_note = "Frappe HR is not installed on this site — install the hrms app to activate this integration."
+		else:
+			self.hr_schedule_note = "HR schedule integration is disabled — booking uses Beauty Employee Schedule only."
+
+		if not self.require_qr_for_check_in and not self.require_id_for_check_in:
+			frappe.throw(
+				_("Enable either Require QR Scan for Check-in or Require Appointment ID for Check-in.")
+			)
+
 
 def get_allowed_payment_modes(channel: str | None = None) -> list[str]:
 	"""Return enabled Mode of Payment names for an optional channel."""

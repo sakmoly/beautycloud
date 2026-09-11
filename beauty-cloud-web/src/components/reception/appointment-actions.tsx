@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { fetchBootstrap, receptionAction } from "@/lib/api/browser-client";
+import { fetchBootstrap, loadPosAppointment, receptionAction } from "@/lib/api/browser-client";
 import type { CalendarEvent } from "@/lib/api/types";
 import { withBasePath } from "@/lib/base-path";
 import { eventTimeLabel } from "@/lib/calendar-utils";
 import { isInactiveAppointmentStatus } from "@/lib/appointment-status";
 import { customerInitials } from "@/components/pos/pos-utils";
+import { CheckInIdValidator } from "@/components/reception/check-in-id-validator";
 import { CheckInQrScanner } from "@/components/reception/check-in-qr-scanner";
 import { AppointmentRescheduleSection } from "@/components/reception/appointment-reschedule";
 import { Badge } from "@/components/ui/badge";
@@ -100,14 +102,12 @@ export function AppointmentActionPanel({
   onClose,
   variant = "default",
   beautyBranch,
-  employees = [],
 }: {
   event: CalendarEvent;
   onUpdated?: () => void;
   onClose?: () => void;
   variant?: "default" | "modal";
   beautyBranch?: string;
-  employees?: Array<{ name: string; employee_name: string }>;
 }) {
   const appointment = event.appointment ?? event.name;
   const appointmentStatus = event.appointment_status ?? "Booked";
@@ -117,20 +117,52 @@ export function AppointmentActionPanel({
   const isModal = variant === "modal";
 
   const [requirePaymentBeforeService, setRequirePaymentBeforeService] = useState(true);
-  const [requireQrForCheckIn, setRequireQrForCheckIn] = useState(true);
+  const [requirePaymentForCheckIn, setRequirePaymentForCheckIn] = useState(true);
+  const [requireQrForCheckIn, setRequireQrForCheckIn] = useState(false);
+  const [requireIdForCheckIn, setRequireIdForCheckIn] = useState(true);
+  const [requireCheckInBeforeService, setRequireCheckInBeforeService] = useState(true);
+  const [requireInvoiceBeforeService, setRequireInvoiceBeforeService] = useState(true);
+  const [canCheckInRole, setCanCheckInRole] = useState(false);
+  const router = useRouter();
+  const [canStartServiceRole, setCanStartServiceRole] = useState(false);
+  const [canCompleteServiceRole, setCanCompleteServiceRole] = useState(false);
   const [checkInToken, setCheckInToken] = useState<string | null>(null);
+  const [checkInIdVerified, setCheckInIdVerified] = useState(false);
+  const [verifiedCheckInId, setVerifiedCheckInId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmNoShow, setConfirmNoShow] = useState(false);
+  const [hasInvoice, setHasInvoice] = useState(Boolean(event.has_invoice));
+
+  useEffect(() => {
+    setHasInvoice(Boolean(event.has_invoice));
+  }, [event.has_invoice, appointment]);
+
+  useEffect(() => {
+    if (!appointment) return;
+    loadPosAppointment(appointment)
+      .then((appt) => setHasInvoice(Boolean(appt.has_invoice)))
+      .catch(() => {});
+  }, [appointment, status]);
 
   useEffect(() => {
     fetchBootstrap()
       .then((b) => {
         setRequirePaymentBeforeService(Boolean(b.salon_payment?.require_payment_before_service));
-        setRequireQrForCheckIn(Boolean(b.salon_payment?.require_qr_for_check_in ?? true));
+        setRequirePaymentForCheckIn(Boolean(b.salon_payment?.require_payment_for_check_in ?? true));
+        setRequireQrForCheckIn(Boolean(b.salon_payment?.require_qr_for_check_in));
+        setRequireIdForCheckIn(Boolean(b.salon_payment?.require_id_for_check_in ?? true));
+        setRequireCheckInBeforeService(Boolean(b.salon_payment?.require_check_in_before_service ?? true));
+        setRequireInvoiceBeforeService(Boolean(b.salon_payment?.require_invoice_before_service ?? true));
+        setCanCheckInRole(Boolean(b.staff_workflow?.can_check_in));
+        setCanStartServiceRole(Boolean(b.staff_workflow?.can_start_service));
+        setCanCompleteServiceRole(Boolean(b.staff_workflow?.can_complete_service));
       })
       .catch(() => {
         setRequirePaymentBeforeService(true);
-        setRequireQrForCheckIn(true);
+        setRequirePaymentForCheckIn(true);
+        setRequireQrForCheckIn(false);
+        setRequireIdForCheckIn(true);
+        setRequireCheckInBeforeService(true);
       });
   }, []);
 
@@ -146,6 +178,27 @@ export function AppointmentActionPanel({
     }
   }
 
+  async function checkInAndOpenPos() {
+    setBusy(true);
+    try {
+      await receptionAction("beauty_cloud.api.reception.check_in", {
+        name: appointment,
+        check_in_token: checkInToken ?? undefined,
+        check_in_id: verifiedCheckInId ?? undefined,
+      });
+      onUpdated?.();
+      if (requireInvoiceBeforeService && appointment) {
+        router.push(
+          withBasePath(
+            `/staff/pos?appointment=${encodeURIComponent(appointment)}&issue_invoice=1`,
+          ),
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function markNoShow() {
     setConfirmNoShow(false);
     await act("beauty_cloud.api.reception.no_show");
@@ -155,16 +208,43 @@ export function AppointmentActionPanel({
     await act("beauty_cloud.api.reception.restore");
   }
 
-  const posHref = withBasePath(`/staff/pos?appointment=${encodeURIComponent(appointment ?? "")}`);
+  const posHref = withBasePath(
+    `/staff/pos?appointment=${encodeURIComponent(appointment ?? "")}&issue_invoice=1`,
+  );
   const timeLabel = eventTimeLabel(event.start ?? event.start_time, event.end ?? event.end_time);
 
   const canConfirm = status === "Draft";
-  const canCheckIn = ["Draft", "Booked", "Confirmed"].includes(status);
-  const checkInReady = canCheckIn && (!requireQrForCheckIn || Boolean(checkInToken));
+  const canCheckIn =
+    canCheckInRole && ["Draft", "Booked", "Confirmed"].includes(status);
+  const checkInVerificationReady = requireQrForCheckIn
+    ? Boolean(checkInToken)
+    : requireIdForCheckIn
+      ? checkInIdVerified
+      : false;
+  const paymentBlocksCheckIn = requirePaymentForCheckIn && !paid;
+  const checkInReady = canCheckIn && checkInVerificationReady && !paymentBlocksCheckIn;
   const paymentBlocksService = requirePaymentBeforeService && !paid;
+  const invoiceReady = !requireInvoiceBeforeService || hasInvoice;
   const canStart =
-    !paymentBlocksService && ["Draft", "Booked", "Confirmed", "Checked In", "Waiting"].includes(status);
-  const canComplete = !paymentBlocksService && ["In Service", "Partially Completed"].includes(status);
+    canStartServiceRole &&
+    !paymentBlocksService &&
+    invoiceReady &&
+    (requireCheckInBeforeService
+      ? ["Checked In", "Waiting", "Partially Completed"].includes(status)
+      : ["Draft", "Booked", "Confirmed", "Checked In", "Waiting", "Partially Completed"].includes(status));
+  const awaitingInvoice =
+    requireInvoiceBeforeService &&
+    !hasInvoice &&
+    canStartServiceRole &&
+    ["Checked In", "Waiting"].includes(status);
+  const canComplete =
+    canCompleteServiceRole &&
+    !paymentBlocksService &&
+    ["In Service", "Partially Completed"].includes(status);
+  const awaitingCheckIn =
+    requireCheckInBeforeService &&
+    canStartServiceRole &&
+    ["Booked", "Confirmed"].includes(status);
   const canNoShow = ["Booked", "Confirmed", "Checked In", "Waiting"].includes(status);
   const isInactive = isInactiveAppointmentStatus(status);
   const canReschedule = !isInactive && !["Completed", "In Service", "Partially Completed"].includes(status);
@@ -235,9 +315,11 @@ export function AppointmentActionPanel({
               appointment={appointment}
               beautyBranch={branch}
               beautyService={event.beauty_service}
+              serviceName={event.service_name}
+              serviceRow={event.service_row}
               appointmentDate={event.appointment_date ?? event.start?.slice(0, 10)}
               employee={event.employee}
-              employees={employees}
+              employeeName={event.employee_name}
               disabled={busy}
               onUpdated={onUpdated}
             />
@@ -248,10 +330,19 @@ export function AppointmentActionPanel({
             email={event.customer_email}
           />
 
-          {paymentBlocksService ? (
+          {paymentBlocksCheckIn ? (
             <p className="rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bc-secondary)]">
-              Payment is required before the service can start. Check the guest in, then take payment at
-              POS to print a receipt.
+              Payment is required before check-in. Take payment at POS first, then verify the guest and
+              check them in.
+            </p>
+          ) : paymentBlocksService ? (
+            <p className="rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bc-secondary)]">
+              Payment is required before the service can start. Use POS to print a receipt if not paid
+              yet.
+            </p>
+          ) : awaitingCheckIn ? (
+            <p className="rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm leading-relaxed text-[color:var(--bc-secondary)]">
+              Reception must check in this guest before you can start the service.
             </p>
           ) : null}
 
@@ -278,6 +369,19 @@ export function AppointmentActionPanel({
               onClear={() => setCheckInToken(null)}
             />
           ) : null}
+          {canCheckIn && !requireQrForCheckIn && requireIdForCheckIn ? (
+            <CheckInIdValidator
+              expectedAppointment={appointment ?? ""}
+              onVerified={(id) => {
+                setCheckInIdVerified(true);
+                setVerifiedCheckInId(id);
+              }}
+              onClear={() => {
+                setCheckInIdVerified(false);
+                setVerifiedCheckInId(null);
+              }}
+            />
+          ) : null}
         </div>
 
         <div className="shrink-0 border-t border-[color:var(--bc-border)] bg-[color:var(--bc-surface)] px-5 py-4 sm:px-6">
@@ -296,14 +400,36 @@ export function AppointmentActionPanel({
               <Button
                 variant="secondary"
                 disabled={busy || !checkInReady}
-                onClick={() =>
-                  act("beauty_cloud.api.reception.check_in", {
-                    check_in_token: checkInToken ?? undefined,
-                  })
-                }
+                onClick={() => void checkInAndOpenPos()}
               >
-                {requireQrForCheckIn && !checkInToken ? "Scan QR to check in" : "Check in"}
+                {paymentBlocksCheckIn
+                  ? "Pay before check-in"
+                  : requireQrForCheckIn && !checkInToken
+                    ? "Scan QR to check in"
+                    : requireIdForCheckIn && !requireQrForCheckIn && !checkInIdVerified
+                      ? "Verify ID to check in"
+                      : requireInvoiceBeforeService
+                        ? "Check in & issue invoice"
+                        : "Check in"}
               </Button>
+            ) : null}
+            {requireInvoiceBeforeService &&
+            ["Checked In", "Waiting"].includes(status) &&
+            canCheckInRole &&
+            !hasInvoice ? (
+              <Link href={posHref} className="bc-btn-dark w-full sm:col-span-2 text-center">
+                {paid ? "Issue salon invoice at POS" : "Collect payment & invoice at POS"}
+              </Link>
+            ) : null}
+            {hasInvoice && ["Checked In", "Waiting", "In Service", "Partially Completed"].includes(status) ? (
+              <p className="sm:col-span-2 text-center text-sm font-medium text-[color:var(--bc-success)]">
+                Salon invoice issued
+              </p>
+            ) : null}
+            {awaitingInvoice ? (
+              <p className="sm:col-span-2 text-center text-sm text-[color:var(--bc-muted)]">
+                Issue salon invoice at POS before starting the service.
+              </p>
             ) : null}
             {canStart ? (
               <Button
@@ -392,10 +518,17 @@ export function AppointmentActionPanel({
         </div>
       </div>
 
-      {paymentBlocksService ? (
+      {paymentBlocksCheckIn ? (
         <p className="mt-3 rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm text-[color:var(--bc-secondary)]">
-          Payment required before service can start. Check the customer in, then complete payment at POS
-          to print a receipt.
+          Payment is required before check-in. Take payment at POS first, then verify the guest.
+        </p>
+      ) : paymentBlocksService ? (
+        <p className="mt-3 rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm text-[color:var(--bc-secondary)]">
+          Payment is required before the service can start.
+        </p>
+      ) : awaitingCheckIn ? (
+        <p className="mt-3 rounded-2xl bg-[color:var(--bc-accent-light)] px-4 py-3 text-sm text-[color:var(--bc-secondary)]">
+          Reception must check in this guest before you can start the service.
         </p>
       ) : null}
 
@@ -412,9 +545,11 @@ export function AppointmentActionPanel({
             appointment={appointment}
             beautyBranch={branch}
             beautyService={event.beauty_service}
+            serviceName={event.service_name}
+            serviceRow={event.service_row}
             appointmentDate={event.appointment_date ?? event.start?.slice(0, 10)}
             employee={event.employee}
-            employees={employees}
+            employeeName={event.employee_name}
             disabled={busy}
             onUpdated={onUpdated}
           />
@@ -428,6 +563,19 @@ export function AppointmentActionPanel({
           expectedAppointment={appointment}
           onVerified={(payload) => setCheckInToken(payload.token)}
           onClear={() => setCheckInToken(null)}
+        />
+      ) : null}
+      {canCheckIn && !requireQrForCheckIn && requireIdForCheckIn ? (
+        <CheckInIdValidator
+          expectedAppointment={appointment ?? ""}
+          onVerified={(id) => {
+            setCheckInIdVerified(true);
+            setVerifiedCheckInId(id);
+          }}
+          onClear={() => {
+            setCheckInIdVerified(false);
+            setVerifiedCheckInId(null);
+          }}
         />
       ) : null}
 
@@ -446,14 +594,29 @@ export function AppointmentActionPanel({
           <Button
             variant="secondary"
             disabled={busy || !checkInReady}
-            onClick={() =>
-              act("beauty_cloud.api.reception.check_in", {
-                check_in_token: checkInToken ?? undefined,
-              })
-            }
+            onClick={() => void checkInAndOpenPos()}
           >
-            {requireQrForCheckIn && !checkInToken ? "Scan QR to check in" : "Check in"}
+            {paymentBlocksCheckIn
+              ? "Pay before check-in"
+              : requireQrForCheckIn && !checkInToken
+                ? "Scan QR to check in"
+                : requireIdForCheckIn && !requireQrForCheckIn && !checkInIdVerified
+                  ? "Verify ID to check in"
+                  : requireInvoiceBeforeService
+                    ? "Check in & issue invoice"
+                    : "Check in"}
           </Button>
+        ) : null}
+        {requireInvoiceBeforeService &&
+        ["Checked In", "Waiting"].includes(status) &&
+        canCheckInRole &&
+        !hasInvoice ? (
+          <Link href={posHref} className="bc-btn-dark">
+            {paid ? "Issue invoice at POS" : "Pay & invoice at POS"}
+          </Link>
+        ) : null}
+        {awaitingInvoice ? (
+          <span className="text-sm text-[color:var(--bc-muted)]">Awaiting salon invoice</span>
         ) : null}
         {canStart ? (
           <Button
@@ -524,7 +687,6 @@ export function QueueAppointmentActions({
   payment_status,
   beauty_branch,
   appointment_date,
-  employees,
   onUpdated,
 }: {
   appointment: string;
@@ -543,7 +705,6 @@ export function QueueAppointmentActions({
   payment_status?: string;
   beauty_branch?: string;
   appointment_date?: string;
-  employees?: Array<{ name: string; employee_name: string }>;
   onUpdated?: () => void;
 }) {
   const firstService = services?.[0];
@@ -568,7 +729,6 @@ export function QueueAppointmentActions({
         start_time: firstService?.start_time,
       }}
       beautyBranch={beauty_branch}
-      employees={employees}
       onUpdated={onUpdated}
     />
   );

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { getPosSessionContext } from "@/lib/api/browser-client";
-import { loadStoredRegister } from "@/components/pos/pos-register-store";
+import { loadStoredRegisterForBranch } from "@/components/pos/pos-register-store";
 import type { PosSessionContext } from "@/components/pos/pos-session-types";
 import { evaluatePosCheckoutReady } from "@/components/pos/pos-session-utils";
 
@@ -21,7 +21,7 @@ export function PosSessionStatus({ branch, onManage, onReadyChange }: Props) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const reg = loadStoredRegister();
+      const reg = loadStoredRegisterForBranch(branch);
       const ctx = (await getPosSessionContext({
         beauty_branch: branch,
         register_code: reg?.register_code,
@@ -31,10 +31,12 @@ export function PosSessionStatus({ branch, onManage, onReadyChange }: Props) {
       const gate = evaluatePosCheckoutReady(ctx, Boolean(reg));
       setBlockReason(gate.reason);
       onReadyChange?.(gate.ready, gate.reason);
-    } catch {
+    } catch (error) {
       setContext(null);
-      setBlockReason("Could not verify POS session");
-      onReadyChange?.(false, "Could not verify POS session");
+      const message =
+        error instanceof Error ? error.message : "Could not verify POS session";
+      setBlockReason(message);
+      onReadyChange?.(false, message);
     } finally {
       setLoading(false);
     }
@@ -46,7 +48,7 @@ export function PosSessionStatus({ branch, onManage, onReadyChange }: Props) {
 
   const dayLabel = context?.business_day?.business_date ?? "Not open";
   const dayStatus = context?.business_day?.status;
-  const registerCode = loadStoredRegister()?.register_code ?? "Not paired";
+  const registerCode = loadStoredRegisterForBranch(branch)?.register_code ?? "Not paired";
   const registerStatus = context?.register_session?.status;
 
   const ready = Boolean(context) && !blockReason;

@@ -10,6 +10,10 @@ from frappe.utils import flt, get_datetime, getdate
 
 from beauty_cloud.services.availability import validate_slot
 from beauty_cloud.services.booking_payment import get_booking_payment_settings
+from beauty_cloud.services.booking_schedule import (
+	booking_channel_for_source,
+	validate_service_assignments,
+)
 from beauty_cloud.services.customer_identity import normalize_email, normalize_mobile, upsert_customer, find_customer
 from beauty_cloud.services.otp import validate_verification_token
 
@@ -41,25 +45,69 @@ def create_booking(payload: dict) -> dict:
 	if not customer:
 		frappe.throw(_("Customer or verified contact details are required"))
 
-	slot = validate_slot(
-		data.beauty_branch,
-		data.appointment_date,
-		service_codes,
-		data.start_time,
-		data.employee,
-		data.get("service_location") or "Salon",
-	)
+	source = data.get("source") or "Online"
+	booking_channel = booking_channel_for_source(source)
+	service_location = data.get("service_location") or "Salon"
+	scheduling_mode = (data.get("scheduling_mode") or "").strip().lower()
+	service_assignments = data.get("service_assignments")
+	if isinstance(service_assignments, str):
+		import json
+
+		service_assignments = json.loads(service_assignments)
+
+	use_split = scheduling_mode == "split" or bool(service_assignments)
+	if use_split and not service_assignments:
+		frappe.throw(_("Service assignments are required for split scheduling"))
 
 	payment_settings = get_booking_payment_settings()
-	source = data.get("source") or "Online"
+	from beauty_cloud.services.payment_gate import get_salon_payment_settings
+
+	salon_payment = get_salon_payment_settings()
 	payment_at_booking = bool(payment_settings["require_payment_at_booking"]) and source == "Online"
+	payment_at_kiosk = bool(salon_payment["require_payment_at_kiosk"]) and source == "Kiosk"
 	try:
-		_validate_no_overlap(data.beauty_branch, data.employee, slot["start_time"], slot["end_time"])
-		if payment_at_booking:
-			initial_status = "Draft"
+		if use_split:
+			validated_lines = validate_service_assignments(
+				data.beauty_branch,
+				data.appointment_date,
+				service_assignments,
+				service_location,
+				booking_channel,
+			)
+			for line in validated_lines:
+				_validate_no_overlap(
+					data.beauty_branch,
+					line["employee"],
+					line["start_time"],
+					line["end_time"],
+				)
+			if payment_at_booking or payment_at_kiosk:
+				initial_status = "Draft"
+			else:
+				initial_status = data.get("status") or "Booked"
+			doc = _build_appointment_doc_from_lines(
+				data,
+				company,
+				customer,
+				validated_lines,
+				status=initial_status,
+			)
 		else:
-			initial_status = data.get("status") or "Booked"
-		doc = _build_appointment_doc(data, company, customer, service_codes, slot, status=initial_status)
+			slot = validate_slot(
+				data.beauty_branch,
+				data.appointment_date,
+				service_codes,
+				data.start_time,
+				data.employee,
+				service_location,
+				booking_channel=booking_channel,
+			)
+			_validate_no_overlap(data.beauty_branch, data.employee, slot["start_time"], slot["end_time"])
+			if payment_at_booking or payment_at_kiosk:
+				initial_status = "Draft"
+			else:
+				initial_status = data.get("status") or "Booked"
+			doc = _build_appointment_doc(data, company, customer, service_codes, slot, status=initial_status)
 		doc.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception:
@@ -67,11 +115,16 @@ def create_booking(payload: dict) -> dict:
 		raise
 
 	result = doc.as_dict()
-	result["payment_required"] = payment_at_booking
+	result["payment_required"] = payment_at_booking or payment_at_kiosk
 	if payment_at_booking:
 		from beauty_cloud.services.booking_payment import create_booking_payment
 
 		payment_session = create_booking_payment(doc.name)
+		result["payment"] = payment_session
+	elif payment_at_kiosk:
+		from beauty_cloud.services.booking_payment import create_kiosk_payment
+
+		payment_session = create_kiosk_payment(doc.name)
 		result["payment"] = payment_session
 	elif doc.status == "Booked":
 		from beauty_cloud.services.booking_notifications import send_booking_confirmation
@@ -193,6 +246,49 @@ def get_customer_appointments(
 			}
 		)
 	return result
+
+
+def _build_appointment_doc_from_lines(data, company, customer, validated_lines, status: str | None = None):
+	from beauty_cloud.services.availability import _get_duration_meta
+
+	service_codes = [line["beauty_service"] for line in validated_lines]
+	meta_by_service = {row["service"]: row for row in _get_duration_meta(service_codes)["services"]}
+	lines = []
+	for line in validated_lines:
+		meta = meta_by_service[line["beauty_service"]]
+		lines.append(
+			{
+				"beauty_service": line["beauty_service"],
+				"employee": line["employee"],
+				"start_time": line["start_time"],
+				"end_time": line["end_time"],
+				"duration": line.get("duration") or meta["duration"],
+				"rate": meta["rate"],
+				"status": "Pending",
+			}
+		)
+
+	appointment_date = getdate(data.appointment_date)
+	if lines:
+		appointment_date = getdate(get_datetime(lines[0]["start_time"]))
+
+	return frappe.get_doc(
+		{
+			"doctype": "Beauty Appointment",
+			"naming_series": "BAPT-.YYYY.-",
+			"company": company,
+			"beauty_branch": data.beauty_branch,
+			"customer": customer,
+			"appointment_date": appointment_date,
+			"status": status or data.get("status") or "Booked",
+			"payment_status": data.get("payment_status") or "Unpaid",
+			"source": data.get("source") or "Online",
+			"service_location": data.get("service_location") or "Salon",
+			"service_address": data.get("service_address"),
+			"notes": data.get("notes"),
+			"services": lines,
+		}
+	)
 
 
 def _build_appointment_doc(data, company, customer, service_codes, slot, status: str | None = None):

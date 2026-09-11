@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { BranchPicker } from "@/components/booking/branch-picker";
 import {
   BookingWizardHeader,
   type WizardStep,
@@ -14,19 +15,22 @@ import {
 import { AppointmentCheckInQr } from "@/components/booking/appointment-check-in-qr";
 import { CategoryServicePicker } from "@/components/marketing/category-service-picker";
 import {
+  ServiceSchedulePicker,
+  scheduleSelectionReady,
+} from "@/components/booking/service-schedule-picker";
+import {
   completeDemoPayment,
   createBooking,
   fetchBootstrap,
   getBranches,
   getServices,
-  getSlots,
   requestCustomerOtp,
   verifyCustomerOtp,
 } from "@/lib/api/browser-client";
 import type {
-  AvailabilitySlot,
   BeautyBranch,
   BookingPaymentSession,
+  ScheduleSelection,
 } from "@/lib/api/types";
 import type { PublicBootstrap, PublicCatalogService } from "@/lib/frappe/types";
 import { Button } from "@/components/ui/button";
@@ -95,8 +99,7 @@ export function BookingWizard({
   const [selectedServiceDetails, setSelectedServiceDetails] = useState<PublicCatalogService[]>([]);
   const [branch, setBranch] = useState("");
   const [date, setDate] = useState("");
-  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
+  const [scheduleSelection, setScheduleSelection] = useState<ScheduleSelection | null>(null);
 
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
@@ -110,14 +113,13 @@ export function BookingWizard({
   const [bookingResult, setBookingResult] = useState<{ name?: string } | null>(null);
 
   const branchImage = bootstrap?.branding?.booking_header_image;
-  const activeBranch = branches.find((b) => b.name === branch) ?? branches[0];
+  const activeBranch = branches.find((b) => b.name === branch);
 
   useEffect(() => {
     Promise.all([getBranches(), fetchBootstrap()])
       .then(async ([b, boot]) => {
         setBranches(b);
         setRequirePayment(Boolean(boot?.booking_payment?.require_payment_at_booking));
-        if (b[0]) setBranch(b[0].name);
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         setDate(tomorrow.toISOString().slice(0, 10));
@@ -148,7 +150,17 @@ export function BookingWizard({
     0,
   );
 
-  const branchLabel = activeBranch?.branch_name ?? branch;
+  const branchLabel = activeBranch?.branch_name ?? "your branch";
+
+  const scheduleServices = useMemo(
+    () =>
+      selectedServiceDetails.map((service) => ({
+        name: service.name,
+        service_name: service.service_name ?? service.name,
+        default_duration: service.default_duration,
+      })),
+    [selectedServiceDetails],
+  );
 
   function toggleService(name: string, service?: PublicCatalogService) {
     setSelectedServiceDetails((prev) => {
@@ -166,36 +178,23 @@ export function BookingWizard({
       return;
     }
     setError(null);
+    if (branches.length === 1) {
+      setBranch(branches[0].name);
+      setScheduleSelection(null);
+      setStep("slots");
+      return;
+    }
     setStep("visit");
   }
 
-  async function loadSlots() {
-    if (!branch || !date || selectedServices.length === 0) {
-      setError("Select branch, date, and at least one service.");
+  function goToSlots() {
+    if (!branch || selectedServices.length === 0) {
+      setError("Select branch and at least one service.");
       return;
     }
-    setBusy(true);
     setError(null);
-    try {
-      const result = await getSlots({
-        beauty_branch: branch,
-        appointment_date: date,
-        services: selectedServices,
-      });
-      setSlots(result);
-      if (result.length === 0) {
-        setError(
-          selectedServices.length > 1
-            ? "No beautician is available for all selected services on this date. Try fewer services, or pick services that the same stylist offers."
-            : "No time slots available for this date. Try another date or branch.",
-        );
-      }
-      setStep("slots");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load slots");
-    } finally {
-      setBusy(false);
-    }
+    setScheduleSelection(null);
+    setStep("slots");
   }
 
   async function sendOtp() {
@@ -228,21 +227,28 @@ export function BookingWizard({
   }
 
   async function submitBooking() {
-    if (!selectedSlot) return;
+    if (!scheduleSelectionReady(scheduleSelection, selectedServices.length)) return;
     setBusy(true);
     setError(null);
     try {
       const result = (await createBooking({
         beauty_branch: branch,
         appointment_date: date,
-        start_time: selectedSlot.start_time,
-        employee: selectedSlot.employee,
         services: selectedServices,
         service_location: "Salon",
         mobile,
         email,
         customer_name: customerName,
         notes: "",
+        ...(scheduleSelection?.mode === "split"
+          ? {
+              scheduling_mode: "split",
+              service_assignments: scheduleSelection.assignments,
+            }
+          : {
+              start_time: scheduleSelection?.mode === "unified" ? scheduleSelection.start_time : undefined,
+              employee: scheduleSelection?.mode === "unified" ? scheduleSelection.employee : undefined,
+            }),
       })) as BookingPaymentSession & { payment?: BookingPaymentSession };
 
       const payment = result.payment ?? result;
@@ -303,9 +309,19 @@ export function BookingWizard({
     if (step === "visit") {
       return {
         show: true,
-        label: busy ? "Finding times…" : "Continue",
-        disabled: busy || !branch || !date,
-        onContinue: loadSlots,
+        label: "Continue",
+        disabled: !branch,
+        onContinue: goToSlots,
+      };
+    }
+    if (step === "slots") {
+      return {
+        show: true,
+        label: "Continue",
+        disabled:
+          !branch ||
+          !scheduleSelectionReady(scheduleSelection, selectedServices.length),
+        onContinue: () => setStep("otp"),
       };
     }
     return { show: false };
@@ -357,79 +373,65 @@ export function BookingWizard({
           ) : null}
 
           {step === "visit" ? (
-            <div className="mx-auto max-w-lg space-y-6">
-              <p className="text-[color:var(--bc-muted)]">
-                Choose where and when you would like your appointment.
-              </p>
-              <div>
-                <Label htmlFor="branch">Branch</Label>
-                <select
-                  id="branch"
-                  className="mt-1.5 min-h-11 w-full border border-[color:var(--bc-border)] bg-white px-3.5 text-sm outline-none focus:border-[color:var(--bc-gold)]"
+            <div className="bc-schedule-flow w-full">
+              <section className="bc-schedule-section">
+                <p className="bc-schedule-section-title">Choose location</p>
+                <p className="bc-schedule-section-sub mb-4">
+                  Where would you like your appointment?
+                </p>
+                <BranchPicker
+                  branches={branches}
                   value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                >
-                  {branches.map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.branch_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="date">Preferred date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  className="mt-1.5"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(nextBranch) => {
+                    setBranch(nextBranch);
+                    setScheduleSelection(null);
+                    setError(null);
+                  }}
                 />
-              </div>
-              <Button variant="ghost" onClick={() => setStep("services")}>
+              </section>
+              <button type="button" className="bc-schedule-back" onClick={() => setStep("services")}>
                 ← Back to services
-              </Button>
+              </button>
             </div>
           ) : null}
 
           {step === "slots" ? (
-            <div className="space-y-4">
-              <p className="text-[color:var(--bc-muted)]">
-                Available slots for {formatDateLabel(date)} at {branchLabel}.
-              </p>
-              {slots.length === 0 ? (
-                <p className="text-sm text-[color:var(--bc-muted)]">No slots available for this date.</p>
+            <div className="bc-schedule-flow w-full">
+              {branches.length > 1 ? (
+                <section className="bc-schedule-section">
+                  <BranchPicker
+                    branches={branches}
+                    value={branch}
+                    onChange={(nextBranch) => {
+                      setBranch(nextBranch);
+                      setScheduleSelection(null);
+                      setError(null);
+                    }}
+                  />
+                </section>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {slots.map((slot) => (
-                    <button
-                      key={`${slot.employee}-${slot.start_time}`}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSlot(slot);
-                        setStep("otp");
-                      }}
-                      className="flex items-start gap-3 border border-[color:var(--bc-border)] bg-white p-4 text-left transition hover:border-[color:var(--bc-gold)] hover:bg-[color:var(--bc-accent-muted)]"
-                    >
-                      <BeauticianAvatar name={slot.employee_name} image={slot.employee_image} />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">{slot.employee_name}</p>
-                        <p className="mt-1 text-lg font-bold text-[color:var(--bc-gold)]">
-                          {slot.start_time.slice(11, 16)}
-                          <span className="mx-1 font-normal text-[color:var(--bc-muted)]">–</span>
-                          {slot.end_time.slice(11, 16)}
-                        </p>
-                        <p className="mt-1 text-xs text-[color:var(--bc-muted)]">
-                          {slot.duration_minutes} min session
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <section className="bc-schedule-section">
+                  <p className="bc-schedule-section-title">Location</p>
+                  <p className="bc-schedule-section-sub mt-1">
+                    Booking at <strong>{branchLabel}</strong>
+                  </p>
+                </section>
               )}
-              <Button variant="ghost" onClick={() => setStep("visit")}>
-                ← Back to visit details
-              </Button>
+              {branch || branches.length <= 1 ? (
+                <ServiceSchedulePicker
+                  beautyBranch={branch}
+                  services={scheduleServices}
+                  bookingChannel="online"
+                  appointmentDate={date}
+                  onAppointmentDateChange={setDate}
+                  value={scheduleSelection}
+                  onChange={setScheduleSelection}
+                  onError={setError}
+                />
+              ) : null}
+              <button type="button" className="bc-schedule-back" onClick={() => setStep("visit")}>
+                ← Change location
+              </button>
             </div>
           ) : null}
 
@@ -508,25 +510,41 @@ export function BookingWizard({
             </Card>
           ) : null}
 
-          {step === "confirm" && selectedSlot ? (
+          {step === "confirm" && scheduleSelection ? (
             <Card title="Confirm your appointment" elevated>
-              <div className="mb-4 flex items-center gap-3 bg-[color:var(--bc-accent-muted)] p-4">
-                <BeauticianAvatar
-                  name={selectedSlot.employee_name}
-                  image={selectedSlot.employee_image}
-                  size="lg"
-                />
-                <div>
-                  <p className="text-xs font-medium uppercase text-[color:var(--bc-muted)]">
-                    Your beautician
-                  </p>
-                  <p className="text-lg font-bold">{selectedSlot.employee_name}</p>
+              {scheduleSelection.mode === "unified" ? (
+                <div className="mb-4 flex items-center gap-3 bg-[color:var(--bc-accent-muted)] p-4">
+                  <BeauticianAvatar
+                    name={scheduleSelection.employee_name}
+                    image={scheduleSelection.employee_image}
+                    size="lg"
+                  />
+                  <div>
+                    <p className="text-xs font-medium uppercase text-[color:var(--bc-muted)]">
+                      Your beautician
+                    </p>
+                    <p className="text-lg font-bold">{scheduleSelection.employee_name}</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <ul className="mb-4 space-y-2 rounded-lg bg-[color:var(--bc-accent-muted)] p-4 text-sm">
+                  {scheduleSelection.assignments.map((assignment) => {
+                    const service = selectedServiceDetails.find((row) => row.name === assignment.beauty_service);
+                    return (
+                      <li key={assignment.beauty_service} className="flex justify-between gap-3">
+                        <span>{service?.service_name ?? assignment.beauty_service}</span>
+                        <span>{assignment.start_time.slice(11, 16)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               <dl className="divide-y divide-[color:var(--bc-border)] text-sm">
                 {[
                   ["Date", formatDateLabel(date)],
-                  ["Time", selectedSlot.start_time.slice(11, 16)],
+                  scheduleSelection.mode === "unified"
+                    ? ["Time", scheduleSelection.start_time.slice(11, 16)]
+                    : ["Schedule", "Per service"],
                   ["Branch", branchLabel],
                   ["Mobile", mobile],
                   ["Email", email],
@@ -613,6 +631,7 @@ export function BookingWizard({
           continueLabel={sidebarContinue.label}
           continueDisabled={sidebarContinue.disabled}
           onContinue={sidebarContinue.onContinue}
+          vat={bootstrap?.vat}
         />
       </div>
     </div>

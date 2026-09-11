@@ -1,6 +1,12 @@
 import type { PosSessionContext } from "@/components/pos/pos-session-types";
 
 export function evaluatePosCheckoutReady(ctx: PosSessionContext, paired: boolean) {
+  if (ctx.register_pairing_error) {
+    return {
+      ready: false,
+      reason: `${ctx.register_pairing_error} — open Register & Day to re-pair`,
+    };
+  }
   if (ctx.enforce_business_day && ctx.business_day?.status !== "Open") {
     return { ready: false, reason: "Open a business day before checkout" };
   }

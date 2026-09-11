@@ -171,7 +171,7 @@ export function InstallAppButton() {
     setKind(detectInstallBrowser());
   }, []);
 
-  if (isStandaloneDisplay()) return null;
+  if (isStandaloneDisplay() || !isMobileDevice()) return null;
 
   return (
     <>
@@ -179,10 +179,10 @@ export function InstallAppButton() {
         type="button"
         onClick={() => setOpen(true)}
         className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[color:var(--bc-border)] bg-white/80 px-3.5 py-2 text-sm font-medium text-[color:var(--bc-muted)] transition hover:border-[color:var(--bc-primary)]/30 hover:text-[color:var(--bc-text)]"
-        title="Add to home screen"
+        title="Install Beauty Cloud on your phone home screen"
       >
         <span aria-hidden>📲</span>
-        Add app
+        Phone app
       </button>
       <InstallAppGuide open={open} onClose={() => setOpen(false)} browserKind={kind} />
     </>

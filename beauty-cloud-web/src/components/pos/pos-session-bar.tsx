@@ -4,12 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   closePosRegisterSession,
+  fetchPosRegisterKey,
   getPosSessionContext,
   openPosBusinessDay,
   openPosRegisterSession,
   pairPosRegister,
   unpairPosRegister,
 } from "@/lib/api/browser-client";
+import type { PosSessionContext as PosSessionContextFull } from "@/components/pos/pos-session-types";
+import {
+  pickDefaultRegisterCode,
+  validateRegisterCodeForPairing,
+} from "@/components/pos/pos-register-utils";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import {
@@ -19,25 +25,7 @@ import {
   type StoredPosRegister,
 } from "@/components/pos/pos-register-store";
 
-export type PosSessionContext = {
-  enforce_business_day?: boolean;
-  enforce_register_session?: boolean;
-  business_day?: {
-    name?: string;
-    business_date?: string;
-    status?: string;
-  } | null;
-  suggested_business_date?: string;
-  register?: { register_code?: string; register_name?: string } | null;
-  register_session?: {
-    name?: string;
-    status?: string;
-    opening_float?: number;
-    business_date?: string;
-  } | null;
-  open_registers?: Array<{ name?: string; register_code?: string; cashier?: string }>;
-  can_unpair_register?: boolean;
-};
+export type PosSessionContext = PosSessionContextFull;
 
 type Props = {
   branch: string;
@@ -54,8 +42,9 @@ export function PosSessionBar({ branch, onReadyChange }: Props) {
   const [showOpenDay, setShowOpenDay] = useState(false);
   const [showCloseRegister, setShowCloseRegister] = useState(false);
 
-  const [pairCode, setPairCode] = useState("REG-01");
+  const [pairCode, setPairCode] = useState("");
   const [pairKey, setPairKey] = useState("");
+  const [keyVisible, setKeyVisible] = useState(false);
   const [openingFloat, setOpeningFloat] = useState("500");
   const [closingCash, setClosingCash] = useState("");
   const [businessDate, setBusinessDate] = useState("");
@@ -92,6 +81,38 @@ export function PosSessionBar({ branch, onReadyChange }: Props) {
     void refresh().catch(() => {});
   }, [refresh]);
 
+  useEffect(() => {
+    setPairCode("");
+    setPairKey("");
+    setKeyVisible(false);
+  }, [branch]);
+
+  useEffect(() => {
+    const registers = context?.available_registers ?? [];
+    if (!stored && registers.length > 0) {
+      setPairCode((current) => pickDefaultRegisterCode(registers, current));
+    }
+  }, [context?.available_registers, stored]);
+
+  async function handleFetchKey() {
+    const registerError = validateRegisterCodeForPairing(pairCode);
+    if (registerError) {
+      setError(registerError);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const key = await fetchPosRegisterKey(pairCode.trim());
+      setPairKey(String(key));
+      setKeyVisible(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not fetch API key");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const needsDay = Boolean(context?.enforce_business_day && context.business_day?.status !== "Open");
   const needsPair = !stored;
   const needsRegister = Boolean(
@@ -99,6 +120,15 @@ export function PosSessionBar({ branch, onReadyChange }: Props) {
   );
 
   async function handlePair() {
+    const registerError = validateRegisterCodeForPairing(pairCode);
+    if (registerError) {
+      setError(registerError);
+      return;
+    }
+    if (!pairKey.trim()) {
+      setError("Fetch or paste the API key before pairing");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -246,7 +276,7 @@ export function PosSessionBar({ branch, onReadyChange }: Props) {
       </div>
 
       <div className="pos-session-bar__actions">
-        {needsDay ? (
+        {needsDay && context.can_open_business_day ? (
           <Button type="button" variant="secondary" onClick={() => setShowOpenDay(true)}>
             Open business day
           </Button>
@@ -277,12 +307,51 @@ export function PosSessionBar({ branch, onReadyChange }: Props) {
 
       {showPair ? (
         <div className="pos-session-bar__panel">
-          <Label>Register code</Label>
-          <Input value={pairCode} onChange={(e) => setPairCode(e.target.value)} />
-          <Label>API key (from Desk → Beauty POS Register → Pairing → Show API Key)</Label>
-          <Input type="password" value={pairKey} onChange={(e) => setPairKey(e.target.value)} />
+          <Label>Register ({branch})</Label>
+          {(context?.available_registers?.length ?? 0) > 0 ? (
+            <select
+              className="min-h-11 w-full rounded-xl border border-[color:var(--bc-border)] bg-white px-3 text-sm"
+              value={pickDefaultRegisterCode(context?.available_registers ?? [], pairCode)}
+              onChange={(e) => {
+                setPairCode(e.target.value);
+                setPairKey("");
+                setKeyVisible(false);
+                setError(null);
+              }}
+            >
+              {context?.available_registers?.map((row) => {
+                const code = row.register_code ?? row.name ?? "";
+                return (
+                  <option key={code} value={code}>
+                    {code}
+                    {row.register_name ? ` · ${row.register_name}` : ""}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <Input value={pairCode} onChange={(e) => setPairCode(e.target.value)} />
+          )}
+          <Label>API key</Label>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input
+              type={keyVisible ? "text" : "password"}
+              value={pairKey}
+              onChange={(e) => setPairKey(e.target.value)}
+            />
+            {context?.can_fetch_pairing_key ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || !pairCode.trim()}
+                onClick={() => void handleFetchKey()}
+              >
+                Fetch key
+              </Button>
+            ) : null}
+          </div>
           <div className="pos-session-bar__panel-actions">
-            <Button type="button" disabled={busy} onClick={() => void handlePair()}>
+            <Button type="button" disabled={busy || !pairCode.trim() || !pairKey.trim()} onClick={() => void handlePair()}>
               Save pairing
             </Button>
             <Button type="button" variant="ghost" onClick={() => setShowPair(false)}>

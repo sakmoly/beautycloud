@@ -16,3 +16,9 @@ class BeautyEmployeeSchedule(Document):
 			branch_company = frappe.db.get_value("Beauty Branch", self.beauty_branch, "company")
 			if branch_company and branch_company != self.company:
 				frappe.throw(_("Branch must belong to company {0}").format(self.company))
+
+	def on_trash(self):
+		from beauty_cloud.services.hr_schedule import sync_beauty_employee_schedule
+
+		self.is_active = 0
+		sync_beauty_employee_schedule(self)
