@@ -187,19 +187,19 @@
    "options": "Light\nDark\nSystem"
   },
   {
-   "default": "#5B2C6F",
+   "default": "#FF1B9A",
    "fieldname": "primary_color",
    "fieldtype": "Color",
    "label": "Primary Color"
   },
   {
-   "default": "#E91E8C",
+   "default": "#2E1A2F",
    "fieldname": "secondary_color",
    "fieldtype": "Color",
    "label": "Secondary Color"
   },
   {
-   "default": "#F4A5C8",
+   "default": "#FCEFF5",
    "fieldname": "accent_color",
    "fieldtype": "Color",
    "label": "Accent Color"
@@ -211,19 +211,19 @@
    "label": "Background Color"
   },
   {
-   "default": "#FFF5F9",
+   "default": "#FAFAFA",
    "fieldname": "surface_color",
    "fieldtype": "Color",
    "label": "Surface Color"
   },
   {
-   "default": "#1A1A2E",
+   "default": "#5A445C",
    "fieldname": "text_color",
    "fieldtype": "Color",
    "label": "Text Color"
   },
   {
-   "default": "#6B7280",
+   "default": "#747474",
    "fieldname": "muted_text_color",
    "fieldtype": "Color",
    "label": "Muted Text Color"

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { CustomerSessionBar } from "@/components/booking/customer-session-bar";
 import { withBasePath } from "@/lib/base-path";
+import { DEFAULT_BRAND_LOGO } from "@/lib/theme/brand-palette";
 import type { PublicBootstrap, WebNavItem } from "@/lib/frappe/types";
 
 export function PromoBar({ text }: { text: string }) {
@@ -232,7 +233,7 @@ export function PublicHeader({ bootstrap }: { bootstrap: PublicBootstrap }) {
   const pathname = usePathname();
   const branding = bootstrap.branding;
   const salon = bootstrap.company_display_name ?? bootstrap.company ?? "Salon";
-  const logo = branding?.logo_light ?? branding?.logo_dark;
+  const logo = branding?.logo_light ?? branding?.logo_dark ?? withBasePath(DEFAULT_BRAND_LOGO);
   const showPromo = branding?.promo_bar_enabled && branding?.promo_bar_text;
   const navigation = bootstrap.navigation ?? [];
 
@@ -242,14 +243,12 @@ export function PublicHeader({ bootstrap }: { bootstrap: PublicBootstrap }) {
       <header className="bc-site-header">
         <div className="bc-site-header-inner mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-3 sm:gap-6 sm:px-6">
           <Link href={withBasePath("/")} className="group flex shrink-0 items-center" aria-label={`${salon} home`}>
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt={salon} className="h-9 w-auto max-w-[160px] object-contain sm:h-10 sm:max-w-[180px]" />
-            ) : (
-              <span className="font-display text-2xl tracking-[0.08em] text-[color:var(--bc-gold)] sm:text-3xl">
-                {salon.split(" ")[0]?.toUpperCase() ?? "SALON"}
-              </span>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logo}
+              alt={salon}
+              className="h-9 w-auto max-w-[200px] object-contain sm:h-10 sm:max-w-[220px]"
+            />
           </Link>
 
           <DesktopNav items={navigation} pathname={pathname} />

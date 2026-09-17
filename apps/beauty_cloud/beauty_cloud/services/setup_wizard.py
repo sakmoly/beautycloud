@@ -142,7 +142,7 @@ def _save_branding_step(data) -> dict:
 	doc.enabled = 1
 	doc.application_title = data.get("application_title") or data.get("company_display_name") or doc.application_title or "Beauty Cloud"
 	doc.company_display_name = data.get("company_display_name") or doc.company_display_name or company
-	doc.primary_color = data.get("primary_color") or doc.primary_color or "#5B2C6F"
+	doc.primary_color = data.get("primary_color") or doc.primary_color or "#FF1B9A"
 	doc.secondary_color = data.get("secondary_color") or doc.secondary_color or "#E91E8C"
 	doc.accent_color = data.get("accent_color") or doc.accent_color or "#F4A5C8"
 	doc.support_email = data.get("support_email") or doc.support_email

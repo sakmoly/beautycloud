@@ -6,7 +6,7 @@ import sharp from "sharp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(__dirname, "..", "public", "icons");
-const themeColor = process.env.PWA_THEME_COLOR ?? "#2F523F";
+const themeColor = process.env.PWA_THEME_COLOR ?? "#FF1B9A";
 
 async function renderIcon(size) {
   const radius = Math.round(size * 0.2);

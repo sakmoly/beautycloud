@@ -4,7 +4,9 @@ import { Geist_Mono, Inter, Playfair_Display } from "next/font/google";
 
 import { InstallAppPrompt } from "@/components/layout/install-app-prompt";
 import { getPublicBootstrap } from "@/lib/frappe/bootstrap";
+import { DEFAULT_BRAND_FAVICON } from "@/lib/theme/brand-palette";
 import { mergeThemeVariables } from "@/lib/theme/variables";
+import { withBasePath } from "@/lib/base-path";
 
 import "./globals.css";
 
@@ -46,29 +48,23 @@ export async function generateMetadata(): Promise<Metadata> {
         statusBarStyle: "default",
       },
       icons: {
-        icon: [
-          { url: `${iconPrefix}/icons/icon-192.png`, sizes: "192x192", type: "image/png" },
-          { url: `${iconPrefix}/icons/icon-512.png`, sizes: "512x512", type: "image/png" },
-        ],
-        apple: [{ url: `${iconPrefix}/icons/apple-touch-icon.png`, sizes: "180x180", type: "image/png" }],
+        icon: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), type: "image/png" }],
+        apple: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), sizes: "180x180", type: "image/png" }],
       },
-      themeColor: vars["--bc-primary"] ?? "#1A1A1A",
+      themeColor: vars["--bc-primary"] ?? "#FF1B9A",
     };
   } catch {
     return {
-      title: "Beauty Cloud",
+      title: "Beau-T-Cloud",
       description: "Salon management platform",
-      applicationName: "Beauty Cloud",
+      applicationName: "Beau-T-Cloud",
       manifest: `${iconPrefix}/manifest.webmanifest`,
-      appleWebApp: { capable: true, title: "Beauty Cloud" },
+      appleWebApp: { capable: true, title: "Beau-T-Cloud" },
       icons: {
-        icon: [
-          { url: `${iconPrefix}/icons/icon-192.png`, sizes: "192x192", type: "image/png" },
-          { url: `${iconPrefix}/icons/icon-512.png`, sizes: "512x512", type: "image/png" },
-        ],
-        apple: [{ url: `${iconPrefix}/icons/apple-touch-icon.png`, sizes: "180x180", type: "image/png" }],
+        icon: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), type: "image/png" }],
+        apple: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), sizes: "180x180", type: "image/png" }],
       },
-      themeColor: "#1A1A1A",
+      themeColor: "#FF1B9A",
     };
   }
 }

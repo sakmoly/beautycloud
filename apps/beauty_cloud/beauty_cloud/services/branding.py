@@ -26,16 +26,16 @@ def get_resolved_branding(company: str, branch: str | None = None) -> dict:
 			doc = frappe.get_doc("Beauty Cloud Branding Settings", docname)
 
 	defaults = {
-		"application_title": "Beauty Cloud",
+		"application_title": "Beau-T-Cloud",
 		"company_display_name": frappe.db.get_value("Company", company, "company_name"),
 		"theme_mode": "Light",
-		"primary_color": "#5B2C6F",
-		"secondary_color": "#E91E8C",
-		"accent_color": "#F4A5C8",
-		"background_color": "#FFFBFC",
-		"surface_color": "#FFF5F9",
-		"text_color": "#2D1B36",
-		"muted_text_color": "#8B6F96",
+		"primary_color": "#FF1B9A",
+		"secondary_color": "#2E1A2F",
+		"accent_color": "#FCEFF5",
+		"background_color": "#FFFFFF",
+		"surface_color": "#FAFAFA",
+		"text_color": "#5A445C",
+		"muted_text_color": "#747474",
 		"success_color": "#16A34A",
 		"warning_color": "#D97706",
 		"danger_color": "#DC2626",
@@ -140,10 +140,18 @@ def _serialize_menu_items(rows: list) -> list[dict]:
 
 
 def _to_css_variables(data: dict) -> dict:
+	primary = data.get("primary_color") or "#FF1B9A"
+	plum = data.get("secondary_color") or "#2E1A2F"
+	blush = data.get("accent_color") or "#FCEFF5"
 	mapping = {
-		"--bc-primary": data.get("primary_color"),
-		"--bc-secondary": data.get("secondary_color"),
-		"--bc-accent": data.get("accent_color"),
+		"--bc-primary": primary,
+		"--bc-primary-soft": "#FF6ED1",
+		"--bc-secondary": primary,
+		"--bc-heading": plum,
+		"--bc-accent": blush,
+		"--bc-accent-light": blush,
+		"--bc-accent-muted": blush,
+		"--bc-beige": data.get("surface_color") or "#FAFAFA",
 		"--bc-background": data.get("background_color"),
 		"--bc-surface": data.get("surface_color"),
 		"--bc-text": data.get("text_color"),
@@ -151,9 +159,10 @@ def _to_css_variables(data: dict) -> dict:
 		"--bc-success": data.get("success_color"),
 		"--bc-warning": data.get("warning_color"),
 		"--bc-danger": data.get("danger_color"),
+		"--bc-border": "#F0D9E4",
 	}
 	radius = {"sm": "0.375rem", "md": "0.75rem", "lg": "1rem", "full": "9999px"}
 	mapping["--bc-radius"] = radius.get(data.get("border_radius_style") or "md", "0.75rem")
-	mapping["--bc-tan"] = data.get("accent_color") or "#D4B896"
-	mapping["--bc-gold"] = data.get("secondary_color") or "#C4A574"
+	mapping["--bc-tan"] = plum
+	mapping["--bc-gold"] = primary
 	return mapping

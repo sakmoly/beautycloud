@@ -259,11 +259,13 @@ def _create_branding(company: str):
 		)
 		doc.insert(ignore_permissions=True)
 
-	doc.surface_color = "#FFF5F9"
-	doc.background_color = "#FFFBFC"
-	doc.primary_color = "#5B2C6F"
-	doc.secondary_color = "#E91E8C"
-	doc.accent_color = "#F4A5C8"
+	doc.surface_color = "#FAFAFA"
+	doc.background_color = "#FFFFFF"
+	doc.primary_color = "#FF1B9A"
+	doc.secondary_color = "#2E1A2F"
+	doc.accent_color = "#FCEFF5"
+	doc.text_color = "#5A445C"
+	doc.muted_text_color = "#747474"
 
 	from beauty_cloud.setup.salon_content import BRANDING, HERO_SLIDES
 
