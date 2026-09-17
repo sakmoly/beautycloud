@@ -36,7 +36,8 @@ def authenticate_kiosk(device_id: str, api_key: str) -> dict:
 	device = frappe.get_doc("Beauty Kiosk Device", device_id)
 	if not device.is_active:
 		frappe.throw(_("Kiosk device is inactive"), frappe.AuthenticationError)
-	if device.api_key != api_key:
+	stored_key = device.get_password("api_key", raise_exception=False)
+	if not stored_key or stored_key != api_key:
 		frappe.throw(_("Invalid kiosk credentials"), frappe.AuthenticationError)
 
 	device.db_set("last_seen_at", now_datetime())

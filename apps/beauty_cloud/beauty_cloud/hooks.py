@@ -5,6 +5,8 @@ app_description = "Multi-tenant salon SaaS on ERPNext"
 app_email = "admin@beautycloud.local"
 app_license = "mit"
 
+app_logo_url = "/assets/beauty_cloud/images/beauty-cloud-logo.png"
+
 # Apps
 # ------------------
 
@@ -14,7 +16,7 @@ app_license = "mit"
 add_to_apps_screen = [
 	{
 		"name": "beauty_cloud",
-		"logo": "/assets/beauty_cloud/images/beauty-cloud-logo.svg",
+		"logo": "/assets/beauty_cloud/images/beauty-cloud-logo.png",
 		"title": "Beauty Cloud",
 		"route": "/app/beauty-cloud",
 	}
