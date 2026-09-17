@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { BrandLogo } from "@/components/branding/brand-logo";
 import type { Branding, WebNavItem } from "@/lib/frappe/types";
 import { withBasePath } from "@/lib/base-path";
 
@@ -110,7 +111,12 @@ export function SiteFooter({
       <div className="bc-site-footer-inner">
         <div className="bc-site-footer-grid">
           <div className="bc-site-footer-brand">
-            <p className="bc-site-footer-logo">{companyName}</p>
+            <BrandLogo
+              branding={branding}
+              alt={companyName}
+              className="bc-site-footer-logo-img"
+              fallback={<p className="bc-site-footer-logo">{companyName}</p>}
+            />
             <p className="bc-site-footer-tagline">{description}</p>
             <SocialLinks branding={branding} />
             <Link href={withBasePath("/contact")} className="bc-footer-cta-link">

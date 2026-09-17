@@ -209,6 +209,13 @@ code {
   color: #fff;
 }
 
+.bc-site-footer-logo-img {
+  height: 2.5rem;
+  width: auto;
+  max-width: 220px;
+  object-fit: contain;
+}
+
 .bc-site-footer-tagline {
   margin-top: 0.85rem;
   font-size: 0.88rem;

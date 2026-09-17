@@ -4,9 +4,8 @@ import { Geist_Mono, Inter, Playfair_Display } from "next/font/google";
 
 import { InstallAppPrompt } from "@/components/layout/install-app-prompt";
 import { getPublicBootstrap } from "@/lib/frappe/bootstrap";
-import { DEFAULT_BRAND_FAVICON } from "@/lib/theme/brand-palette";
+import { buildMetadataIcons, resolveBrandFavicon } from "@/lib/theme/branding-assets";
 import { mergeThemeVariables } from "@/lib/theme/variables";
-import { withBasePath } from "@/lib/base-path";
 
 import "./globals.css";
 
@@ -34,6 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const bootstrap = await getPublicBootstrap();
     const vars = mergeThemeVariables(bootstrap.branding?.css_variables);
     const title = bootstrap.application_title ?? "Beauty Cloud";
+    const favicon = resolveBrandFavicon(bootstrap.branding);
     return {
       title: {
         default: title,
@@ -47,23 +47,16 @@ export async function generateMetadata(): Promise<Metadata> {
         title,
         statusBarStyle: "default",
       },
-      icons: {
-        icon: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), type: "image/png" }],
-        apple: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), sizes: "180x180", type: "image/png" }],
-      },
+      ...buildMetadataIcons(favicon),
       themeColor: vars["--bc-primary"] ?? "#FF1B9A",
     };
   } catch {
     return {
-      title: "Beau-T-Cloud",
+      title: "Beauty Cloud",
       description: "Salon management platform",
-      applicationName: "Beau-T-Cloud",
+      applicationName: "Beauty Cloud",
       manifest: `${iconPrefix}/manifest.webmanifest`,
-      appleWebApp: { capable: true, title: "Beau-T-Cloud" },
-      icons: {
-        icon: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), type: "image/png" }],
-        apple: [{ url: withBasePath(DEFAULT_BRAND_FAVICON), sizes: "180x180", type: "image/png" }],
-      },
+      appleWebApp: { capable: true, title: "Beauty Cloud" },
       themeColor: "#FF1B9A",
     };
   }

@@ -10,6 +10,3 @@ export const BEAU_T_CLOUD_PALETTE = {
   muted: "#747474",
   body: "#5a445c",
 } as const;
-
-export const DEFAULT_BRAND_LOGO = "/brand/beau-t-cloud-primary.png";
-export const DEFAULT_BRAND_FAVICON = "/brand/favicon.png";
