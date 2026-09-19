@@ -65,6 +65,16 @@ def create_booking(payload: dict) -> dict:
 	salon_payment = get_salon_payment_settings()
 	payment_at_booking = bool(payment_settings["require_payment_at_booking"]) and source == "Online"
 	payment_at_kiosk = bool(salon_payment["require_payment_at_kiosk"]) and source == "Kiosk"
+	if not use_split and (payment_at_booking or payment_at_kiosk):
+		existing = _find_reusable_unpaid_draft(
+			customer=customer,
+			beauty_branch=data.beauty_branch,
+			employee=data.employee,
+			start_time=data.start_time,
+			service_codes=service_codes,
+		)
+		if existing:
+			return _resume_unpaid_booking(existing, payment_at_booking, payment_at_kiosk)
 	try:
 		if use_split:
 			validated_lines = validate_service_assignments(
@@ -135,6 +145,58 @@ def create_booking(payload: dict) -> dict:
 			queue="short",
 			now=True,
 		)
+	return result
+
+
+def _find_reusable_unpaid_draft(
+	customer: str,
+	beauty_branch: str,
+	employee: str | None,
+	start_time,
+	service_codes: list[str],
+) -> str | None:
+	"""Return an unpaid draft already holding this customer + slot, if any."""
+	if not customer or not employee or not start_time:
+		return None
+	start_dt = get_datetime(start_time)
+	rows = frappe.db.sql(
+		"""
+		select ba.name
+		from `tabBeauty Appointment` ba
+		inner join `tabBeauty Appointment Service` bas on bas.parent = ba.name
+		where ba.customer = %(customer)s
+		  and ba.beauty_branch = %(branch)s
+		  and ba.status = 'Draft'
+		  and ifnull(ba.payment_status, 'Unpaid') in ('Unpaid', '')
+		  and bas.employee = %(employee)s
+		  and bas.start_time = %(start)s
+		  and bas.beauty_service = %(service)s
+		order by ba.modified desc
+		limit 1
+		""",
+		{
+			"customer": customer,
+			"branch": beauty_branch,
+			"employee": employee,
+			"start": start_dt,
+			"service": service_codes[0] if service_codes else None,
+		},
+	)
+	return rows[0][0] if rows else None
+
+
+def _resume_unpaid_booking(appointment_name: str, payment_at_booking: bool, payment_at_kiosk: bool) -> dict:
+	doc = frappe.get_doc("Beauty Appointment", appointment_name)
+	result = doc.as_dict()
+	result["payment_required"] = True
+	if payment_at_booking:
+		from beauty_cloud.services.booking_payment import create_booking_payment
+
+		result["payment"] = create_booking_payment(doc.name)
+	elif payment_at_kiosk:
+		from beauty_cloud.services.booking_payment import create_kiosk_payment
+
+		result["payment"] = create_kiosk_payment(doc.name)
 	return result
 
 

@@ -57,6 +57,7 @@ export async function generateMetadata(): Promise<Metadata> {
       applicationName: "Beauty Cloud",
       manifest: `${iconPrefix}/manifest.webmanifest`,
       appleWebApp: { capable: true, title: "Beauty Cloud" },
+      ...buildMetadataIcons("/assets/beauty_cloud/images/beauty-cloud-favicon.png"),
       themeColor: "#FF1B9A",
     };
   }

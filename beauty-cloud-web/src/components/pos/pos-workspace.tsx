@@ -44,6 +44,7 @@ import {
   productIcon,
   serviceIcon,
 } from "@/components/pos/pos-utils";
+import { CatalogPhoto } from "@/components/ui/catalog-photo";
 import { printPosReceipt } from "@/components/pos/pos-receipt-print";
 import { loadStoredRegisterForBranch } from "@/components/pos/pos-register-store";
 import type { PosSessionContext } from "@/components/pos/pos-session-types";
@@ -788,7 +789,9 @@ export function PosWorkspace() {
                       className={`bc-cat-root-pill ${selectedCategory === cat.name ? "active" : ""}`}
                       onClick={() => setSelectedCategory(cat.name)}
                     >
-                      <span className="bc-cat-root-icon">{categoryIcon(cat.label)}</span>
+                      <span className={`bc-cat-root-icon ${cat.image ? "has-photo" : ""}`}>
+                        <CatalogPhoto src={cat.image} alt="" fallback={categoryIcon(cat.label)} />
+                      </span>
                       <span>{cat.label}</span>
                     </button>
                   ))}
@@ -815,8 +818,8 @@ export function PosWorkspace() {
                         className="bc-service-list-row"
                       >
                         <span className="bc-service-list-accent" aria-hidden />
-                        <span className="bc-service-list-icon" aria-hidden>
-                          {serviceIcon(service.service_name)}
+                        <span className={`bc-service-list-icon ${service.image ? "has-photo" : ""}`} aria-hidden>
+                          <CatalogPhoto src={service.image} alt="" fallback={serviceIcon(service.service_name)} />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
@@ -871,7 +874,9 @@ export function PosWorkspace() {
                       onClick={() => addProduct(product)}
                       className="pos-product-tile"
                     >
-                      <span className="pos-product-tile-icon">{productIcon(product.item_name)}</span>
+                      <span className={`pos-product-tile-icon ${product.image ? "has-photo" : ""}`}>
+                        <CatalogPhoto src={product.image} alt="" fallback={productIcon(product.item_name)} />
+                      </span>
                       <span className="pos-product-tile-name">{product.item_name}</span>
                       <span className="pos-product-tile-price">SAR {product.rate ?? 0}</span>
                     </button>

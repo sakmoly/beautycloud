@@ -37,7 +37,9 @@ export function useStaffBranch() {
           setBranch(rows[0].name);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setBranches([]);
+      })
       .finally(() => setReady(true));
   }, []);
 

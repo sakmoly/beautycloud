@@ -398,8 +398,8 @@
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.require_payment_at_booking",
-   "description": "Enable Telr hosted payment page for online booking checkout.",
+   "depends_on": "eval:doc.require_payment_at_booking || doc.require_payment_at_kiosk",
+   "description": "Enable Telr hosted payment page for online booking and kiosk card checkout.",
    "fieldname": "enable_telr",
    "fieldtype": "Check",
    "label": "Enable Telr Gateway"

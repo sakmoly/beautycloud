@@ -169,6 +169,7 @@ export interface PublicCatalogService {
   default_duration?: number;
   standard_selling_price?: number;
   description?: string | null;
+  image?: string | null;
 }
 
 export interface PublicServiceCatalog {

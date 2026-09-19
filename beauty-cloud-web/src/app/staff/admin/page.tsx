@@ -1,15 +1,13 @@
 import { AdminBrandingView } from "@/components/admin/admin-branding";
 import { StaffShell } from "@/components/layout/staff-shell";
-import { requireStaffSession } from "@/lib/auth/staff-guard";
+import { requireManagerSession } from "@/lib/auth/staff-guard";
 import { getFrappeConfig } from "@/lib/config";
-import { getPublicBootstrap } from "@/lib/frappe/bootstrap";
 
 export const metadata = { title: "Admin" };
 
 export default async function AdminPage() {
-  const [bootstrap, session, frappe] = await Promise.all([
-    getPublicBootstrap(),
-    requireStaffSession(),
+  const [{ bootstrap, session }, frappe] = await Promise.all([
+    requireManagerSession(),
     Promise.resolve(getFrappeConfig()),
   ]);
 

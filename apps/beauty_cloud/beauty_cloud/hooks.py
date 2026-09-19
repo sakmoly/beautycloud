@@ -86,7 +86,10 @@ add_to_apps_screen = [
 # before_install = "beauty_cloud.install.before_install"
 # after_install = "beauty_cloud.install.after_install"
 after_install = "beauty_cloud.install.after_install"
-after_migrate = ["beauty_cloud.setup.sync.sync_child_doctypes"]
+after_migrate = [
+	"beauty_cloud.setup.sync.sync_child_doctypes",
+	"beauty_cloud.setup.catalog_images.apply_catalog_images",
+]
 
 before_request = ["beauty_cloud.utils.api_guard.before_api_request"]
 

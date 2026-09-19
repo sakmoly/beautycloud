@@ -1,6 +1,7 @@
 "use client";
 
 import type { PublicCatalogCategory } from "@/lib/frappe/types";
+import { CatalogPhoto } from "@/components/ui/catalog-photo";
 import { categoryEmoji } from "@/lib/category-emoji";
 
 export function CategoryNav({
@@ -40,13 +41,8 @@ export function CategoryNav({
               className={`bc-cat-root-pill ${activeRoot === category.name ? "active" : ""}`}
               onClick={() => onSelectRoot(category.name)}
             >
-              <span className="bc-cat-root-icon" aria-hidden>
-                {category.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={category.image} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  categoryEmoji(category.label)
-                )}
+              <span className={`bc-cat-root-icon ${category.image ? "has-photo" : ""}`} aria-hidden>
+                <CatalogPhoto src={category.image} alt="" fallback={categoryEmoji(category.label)} />
               </span>
               <span>{category.label}</span>
             </button>

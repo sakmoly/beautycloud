@@ -28,6 +28,7 @@ export function BookingTicketSidebar({
   onContinue,
   continueLabel = "Continue",
   continueDisabled = false,
+  continueHint,
   showContinue = false,
   vat,
 }: {
@@ -43,6 +44,7 @@ export function BookingTicketSidebar({
   onContinue?: () => void;
   continueLabel?: string;
   continueDisabled?: boolean;
+  continueHint?: string;
   showContinue?: boolean;
   vat?: VatBootstrapSettings;
 }) {
@@ -160,12 +162,39 @@ export function BookingTicketSidebar({
             type="button"
             onClick={onContinue}
             disabled={continueDisabled}
-            className="bc-btn-dark mt-4 w-full disabled:opacity-50"
+            className="bc-booking-ticket-continue bc-btn-dark mt-4 w-full disabled:opacity-50"
           >
             {continueLabel}
           </button>
         ) : null}
       </div>
+      {showContinue && onContinue ? (
+        <div className="bc-booking-sticky-bar">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-tight">
+              {selectedServices.length === 0 ? "Select a service" : `${currency} ${totalPrice}`}
+            </p>
+            <p className="truncate text-xs text-[color:var(--bc-muted)]">
+              {continueHint ??
+                (selectedServices.length === 0
+                  ? "Add a service to continue"
+                  : continueDisabled
+                    ? "Choose a time to continue"
+                    : totalDuration > 0
+                      ? `Ready · ${formatDuration(totalDuration)}`
+                      : "Ready to continue")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={continueDisabled}
+            className="bc-btn-dark bc-booking-sticky-continue disabled:opacity-50"
+          >
+            {continueLabel}
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

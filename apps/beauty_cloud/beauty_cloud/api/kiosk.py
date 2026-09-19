@@ -9,6 +9,7 @@ from beauty_cloud.services.kiosk import (
 	kiosk_create_booking,
 	kiosk_get_available_slots,
 	kiosk_get_beauticians,
+	kiosk_get_check_in_qr,
 	kiosk_get_schedule_plan,
 	kiosk_get_service_slots,
 )
@@ -91,3 +92,8 @@ def book(device_id: str, api_key: str, data=None):
 @frappe.whitelist(allow_guest=True)
 def collect_payment(device_id: str, api_key: str, appointment: str, mode_of_payment: str = "Cash"):
 	return kiosk_collect_payment(device_id, api_key, appointment, mode_of_payment)
+
+
+@frappe.whitelist(allow_guest=True)
+def get_check_in_qr(device_id: str, api_key: str, appointment: str):
+	return kiosk_get_check_in_qr(device_id, api_key, appointment)

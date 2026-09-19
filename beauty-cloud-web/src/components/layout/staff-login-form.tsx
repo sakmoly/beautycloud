@@ -41,7 +41,7 @@ export function StaffLoginForm({
       if (!response.ok) {
         throw new Error(payload.error ?? "Login failed");
       }
-      router.push("/staff/reception");
+      router.push("/staff");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -71,7 +71,7 @@ export function StaffLoginForm({
             <BrandLogo
               branding={branding}
               alt={companyName}
-              className="h-10 w-auto max-w-[220px] object-contain sm:h-12"
+              className="bc-login-logo"
               fallback={
                 <p className="font-display text-2xl font-bold tracking-tight text-[color:var(--bc-heading)]">
                   {appTitle}

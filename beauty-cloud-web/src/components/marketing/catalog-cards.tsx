@@ -2,6 +2,7 @@
 
 import type { PublicCatalogCategory, PublicCatalogService } from "@/lib/frappe/types";
 
+import { CatalogPhoto } from "@/components/ui/catalog-photo";
 import { categoryEmoji } from "@/lib/category-emoji";
 
 export function CategoryCard({
@@ -18,16 +19,12 @@ export function CategoryCard({
       className="group overflow-hidden rounded-[var(--bc-radius-lg)] border border-[color:var(--bc-border)] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--bc-primary)]/30 hover:shadow-lg"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-[color:var(--bc-accent)]/30 to-[color:var(--bc-primary)]/10">
-        {category.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={category.image}
-            alt={category.label}
-            className="h-full w-full object-cover transition group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-5xl">{categoryEmoji(category.label)}</div>
-        )}
+        <CatalogPhoto
+          src={category.image}
+          alt={category.label}
+          className="h-full w-full object-cover transition group-hover:scale-105"
+          fallback={<div className="flex h-full items-center justify-center text-5xl">{categoryEmoji(category.label)}</div>}
+        />
       </div>
       <div className="p-4">
         <p className="text-lg font-semibold text-[color:var(--bc-text)]">{category.label}</p>
@@ -68,8 +65,8 @@ export function ServiceListRow({
       className={`bc-service-list-row ${selected ? "selected" : ""}`}
     >
       <span className="bc-service-list-accent" aria-hidden />
-      <span className="bc-service-list-icon" aria-hidden>
-        {icon}
+      <span className={`bc-service-list-icon ${service.image ? "has-photo" : ""}`} aria-hidden>
+        <CatalogPhoto src={service.image} alt="" fallback={icon} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
@@ -113,11 +110,15 @@ export function ServiceCard({
       }`}
     >
       <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ${
-          selected ? "bg-[color:var(--bc-primary)] text-white" : "bg-[color:var(--bc-beige)]"
+        className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl ${
+          selected && !service.image ? "bg-[color:var(--bc-primary)] text-white" : "bg-[color:var(--bc-beige)]"
         }`}
       >
-        {categoryEmoji(service.service_name ?? "")}
+        <CatalogPhoto
+          src={service.image}
+          alt=""
+          fallback={categoryEmoji(service.service_name ?? "")}
+        />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">

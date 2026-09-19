@@ -148,10 +148,17 @@ def _fetch_services(
 			"allow_salon",
 			"allow_home",
 			"allow_hotel",
+			"image",
 		],
 		order_by="service_name asc",
 	)
-	return rows
+	return [_serialize_service_row(row) for row in rows]
+
+
+def _serialize_service_row(row) -> dict:
+	data = dict(row)
+	data["image"] = public_file_url(data.get("image"))
+	return data
 
 
 def _serialize_category(

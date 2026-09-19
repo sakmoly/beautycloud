@@ -17,17 +17,17 @@ export function KioskShell({
     <div className="bc-kiosk-app flex min-h-screen flex-col bg-[color:var(--bc-background)]">
       <header className="bc-kiosk-header">
         <div className="bc-kiosk-header-inner">
-          <div className="bc-kiosk-brand">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={salonName} className="bc-kiosk-logo" />
-            ) : null}
-            <div>
-              <p className="bc-kiosk-eyebrow">Self-service check-in</p>
-              <h1 className="bc-kiosk-title">{salonName}</h1>
-            </div>
+          <div className="bc-kiosk-heading">
+            <p className="bc-kiosk-eyebrow">Self-service check-in</p>
+            <h1 className="bc-kiosk-title">{salonName}</h1>
+            {branchName ? <p className="bc-kiosk-branch">{branchName}</p> : null}
           </div>
-          {branchName ? <p className="bc-kiosk-branch">{branchName}</p> : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoUrl || "/assets/beauty_cloud/images/beauty-cloud-wordmark.png"}
+            alt="Beau-T-Cloud"
+            className="bc-kiosk-logo"
+          />
         </div>
       </header>
       <main className="bc-kiosk-main flex-1">{children}</main>

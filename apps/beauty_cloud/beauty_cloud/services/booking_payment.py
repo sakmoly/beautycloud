@@ -202,7 +202,19 @@ def get_payment_session(
 	payment_url = telr_response.get("order", {}).get("url")
 	if not payment_url:
 		frappe.log_error(title="Telr create order failed", message=json.dumps(telr_response))
-		frappe.throw(_("Could not start Telr payment session"))
+		telr_error = (
+			(telr_response.get("error") or {}).get("message")
+			or telr_response.get("error")
+			or _("Could not start Telr payment session")
+		)
+		if "Invalid store ID" in str(telr_error):
+			frappe.throw(
+				_(
+					"Telr rejected the Store ID. Use your real Telr merchant Store ID, "
+					"or turn Telr Demo Mode on until you have live credentials."
+				)
+			)
+		frappe.throw(_(str(telr_error)))
 
 	payment.db_set(
 		{

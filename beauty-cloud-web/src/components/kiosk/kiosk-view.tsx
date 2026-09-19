@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AppointmentCheckInQr } from "@/components/booking/appointment-check-in-qr";
 import { BranchPicker } from "@/components/booking/branch-picker";
 import {
   ServiceSchedulePicker,
@@ -23,6 +24,7 @@ import type {
   PublicCatalogService,
 } from "@/lib/frappe/types";
 import { categoryEmoji } from "@/lib/category-emoji";
+import { CatalogPhoto } from "@/components/ui/catalog-photo";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { ErrorState, LoadingState } from "@/components/ui/states";
@@ -738,8 +740,7 @@ export function KioskView() {
               <p className="bc-kiosk-sidebar-label">Card details</p>
               {paymentSession.demo_card ? (
                 <p className="text-sm text-[color:var(--bc-muted)]">
-                  Demo mode — try {paymentSession.demo_card.number}, expiry {paymentSession.demo_card.expiry},
-                  CVV {paymentSession.demo_card.cvv}.
+                  Test card {paymentSession.demo_card.number}, expiry 12/28, CVV {paymentSession.demo_card.cvv}.
                 </p>
               ) : null}
               <div>
@@ -784,9 +785,11 @@ export function KioskView() {
                 <Button
                   className="bc-kiosk-primary-btn min-w-[min(100%,360px)]"
                   onClick={() => void payWithDemoCard()}
-                  disabled={busy}
+                  disabled={busy || !cardFormValid()}
                 >
-                  {busy ? "Processing…" : `Pay ${currency} ${Number(amount).toLocaleString()}`}
+                  {busy
+                    ? "Confirming payment…"
+                    : `Confirm payment · ${currency} ${Number(amount).toLocaleString()}`}
                 </Button>
               </div>
             </div>
@@ -832,6 +835,11 @@ export function KioskView() {
             <p className="bc-kiosk-ref-label">Reference</p>
             <p className="bc-kiosk-ref-value">{bookingRef}</p>
           </div>
+          {bookingRef && bookingRef !== "—" ? (
+            <div className="bc-kiosk-checkin-qr mx-auto mt-6 max-w-sm">
+              <AppointmentCheckInQr appointment={bookingRef} kioskAuth={kioskAuth} />
+            </div>
+          ) : null}
           <p className="bc-kiosk-panel-sub max-w-lg">
             {paymentRequired
               ? "Payment received. Please take a seat — our team will call you shortly."
@@ -868,13 +876,8 @@ export function KioskView() {
                 className={`bc-kiosk-root-card ${activeRoot === category.name ? "active" : ""}`}
                 onClick={() => void selectRoot(category.name)}
               >
-                <span className="bc-kiosk-root-icon" aria-hidden>
-                  {category.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={category.image} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    categoryEmoji(category.label)
-                  )}
+                <span className={`bc-kiosk-root-icon ${category.image ? "has-photo" : ""}`} aria-hidden>
+                  <CatalogPhoto src={category.image} alt="" fallback={categoryEmoji(category.label)} />
                 </span>
                 <span className="bc-kiosk-root-label">{category.label}</span>
               </button>
@@ -938,8 +941,17 @@ export function KioskView() {
                     className={`bc-kiosk-service-card ${active ? "active" : ""}`}
                     aria-pressed={active}
                   >
-                    <span className={`bc-kiosk-service-icon ${active ? "active" : ""}`}>
-                      {active ? "✓" : serviceIcon(service.service_name ?? "")}
+                    <span className={`bc-kiosk-service-icon ${active ? "active" : ""} ${service.image ? "has-photo" : ""}`}>
+                      {service.image ? (
+                        <>
+                          <CatalogPhoto src={service.image} alt="" fallback={serviceIcon(service.service_name ?? "")} />
+                          {active ? <span className="bc-kiosk-service-check">✓</span> : null}
+                        </>
+                      ) : active ? (
+                        "✓"
+                      ) : (
+                        serviceIcon(service.service_name ?? "")
+                      )}
                     </span>
                     <span className="bc-kiosk-service-body">
                       <span className="bc-kiosk-service-name">{service.service_name}</span>

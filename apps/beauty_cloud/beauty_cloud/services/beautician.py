@@ -301,9 +301,12 @@ def get_product_catalogue(
 		as_dict=True,
 	)
 
+	from beauty_cloud.utils.files import public_file_url
+
 	for row in items:
 		row["rate"] = _get_item_selling_rate(row.item_code, company)
 		row["in_stock"] = flt(row.stock_qty) > 0
+		row["image"] = public_file_url(row.get("image"))
 
 	total = frappe.db.sql(
 		f"""

@@ -58,7 +58,7 @@ STAFF_USERS = [
 		"last_name": "Reception",
 		"role": "Beauty Cloud Receptionist",
 		"branch": "003",
-		"employee_name": "Jeddah Reception Desk",
+		"employee_name": "Jeddah Reception",
 		"designation": "Receptionist",
 	},
 	{
@@ -67,7 +67,7 @@ STAFF_USERS = [
 		"last_name": "Cashier",
 		"role": "Beauty Cloud Cashier",
 		"branch": "003",
-		"employee_name": "Jeddah POS Cashier",
+		"employee_name": "Jeddah Cashier",
 		"designation": "Cashier",
 	},
 	{

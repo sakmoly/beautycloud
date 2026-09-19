@@ -272,16 +272,19 @@ def _validate_services_for_booking(
 def _get_duration_meta(service_codes: list[str]) -> dict:
 	total = 0
 	service_rows = []
+	fields = ["default_duration", "standard_selling_price"]
+	if frappe.db.has_column("Beauty Service", "buffer_before_minutes"):
+		fields.extend(["buffer_before_minutes", "buffer_after_minutes"])
 	for code in service_codes:
 		row = frappe.db.get_value(
 			"Beauty Service",
 			code,
-			["default_duration", "buffer_before_minutes", "buffer_after_minutes", "standard_selling_price"],
+			fields,
 			as_dict=True,
-		)
+		) or frappe._dict()
 		duration = int(row.default_duration or 60)
-		buffer_before = int(row.buffer_before_minutes or 0)
-		buffer_after = int(row.buffer_after_minutes or 0)
+		buffer_before = int(row.get("buffer_before_minutes") or 0)
+		buffer_after = int(row.get("buffer_after_minutes") or 0)
 		line_total = buffer_before + duration + buffer_after
 		total += line_total
 		service_rows.append(

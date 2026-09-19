@@ -630,9 +630,22 @@
   width: 3rem;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border-radius: 0.875rem;
   background: #fff;
   font-size: 1.35rem;
+}
+
+.pos-product-tile-icon.has-photo {
+  height: 5.5rem;
+  width: 100%;
+  background: #f3eee8;
+}
+
+.pos-product-tile-icon img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
 }
 
 .pos-product-tile-name {

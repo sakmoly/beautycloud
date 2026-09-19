@@ -2,8 +2,10 @@
 
 import frappe
 
+from beauty_cloud.setup.catalog_images import CATEGORY_IMAGES, SERVICE_IMAGES
 
-COMPANY = "Bahyea Bauty"
+
+COMPANY = "beautcloud"
 
 
 def ensure_defaults():
@@ -170,16 +172,39 @@ def _ensure_mode_of_payment_account(mode: str, company: str, account: str | None
 	).insert(ignore_permissions=True)
 
 
+def ensure_booking_staff(company: str | None = None):
+	"""Create missing beauticians, skills, and working hours for booking."""
+	company = company or frappe.db.get_value("Company", {"company_name": COMPANY}) or COMPANY
+	if not frappe.db.exists("Company", company):
+		return {"employees": 0}
+	_ensure_branch_schedule(company)
+	_ensure_jeddah_branch(company)
+	_ensure_beauticians(company)
+	_ensure_employee_skills(company)
+	_ensure_employee_schedules(company)
+	frappe.db.commit()
+	return {
+		"employees": frappe.db.count(
+			"Employee",
+			{"company": company, "status": "Active", "designation": ("not in", ["Branch Manager", "Receptionist", "Cashier"])},
+		)
+	}
+
+
 def load_demo_data():
 	company = frappe.db.get_value("Company", {"company_name": COMPANY}) or COMPANY
 	if not frappe.db.exists("Company", company):
 		return
 
 	_create_branch(company)
+	_ensure_jeddah_branch(company)
 	_create_branding(company)
 	_ensure_branch_schedule(company)
 	_ensure_service_category_tree(company)
 	_create_services(company)
+	from beauty_cloud.setup.catalog_images import ensure_demo_retail_products
+
+	ensure_demo_retail_products()
 	_ensure_beauticians(company)
 	_ensure_employee_skills(company)
 	_ensure_employee_schedules(company)
@@ -215,6 +240,64 @@ def _create_branch(company: str):
 		}
 	)
 	doc.insert(ignore_permissions=True)
+
+
+def _ensure_jeddah_branch(company: str):
+	if frappe.db.exists("Beauty Branch", "003"):
+		frappe.db.set_value("Beauty Branch", "003", "is_active", 1, update_modified=False)
+		return
+
+	retail_wh = (
+		frappe.db.get_value("Beauty Branch", "BBY-MAIN", "retail_warehouse")
+		or _ensure_warehouse(company, "BBY Retail - BC", "BBY Retail")
+	)
+	cons_wh = (
+		frappe.db.get_value("Beauty Branch", "BBY-MAIN", "consumables_warehouse")
+		or _ensure_warehouse(company, "BBY Consumables - BC", "BBY Consumables")
+	)
+	frappe.get_doc(
+		{
+			"doctype": "Beauty Branch",
+			"branch_code": "003",
+			"branch_name": "Jeddah Salon",
+			"company": company,
+			"is_active": 1,
+			"retail_warehouse": retail_wh,
+			"consumables_warehouse": cons_wh,
+			"default_warehouse": retail_wh,
+			"phone": "+966512000003",
+			"email": "jeddah@beautycloud.local",
+			"address": "Jeddah, Saudi Arabia",
+		}
+	).insert(ignore_permissions=True)
+
+	if not frappe.db.exists("Beauty Branch Schedule", "003"):
+		weekdays = [
+			"Monday",
+			"Tuesday",
+			"Wednesday",
+			"Thursday",
+			"Friday",
+			"Saturday",
+			"Sunday",
+		]
+		frappe.get_doc(
+			{
+				"doctype": "Beauty Branch Schedule",
+				"beauty_branch": "003",
+				"company": company,
+				"slot_interval_minutes": 15,
+				"hours": [
+					{
+						"weekday": day,
+						"open_time": "09:00:00",
+						"close_time": "21:00:00",
+						"is_closed": 0,
+					}
+					for day in weekdays
+				],
+			}
+		).insert(ignore_permissions=True)
 
 
 def _ensure_warehouse(company: str, name: str, wh_name: str) -> str:
@@ -378,6 +461,8 @@ def _upsert_category(
 		doc.sort_order = sort_order
 		doc.is_active = 1
 		doc.parent_beauty_service_category = parent
+		if not doc.image and name in CATEGORY_IMAGES:
+			doc.image = CATEGORY_IMAGES[name]
 		doc.save(ignore_permissions=True)
 		return doc
 
@@ -391,6 +476,7 @@ def _upsert_category(
 			"is_active": 1,
 			"sort_order": sort_order,
 			"parent_beauty_service_category": parent,
+			"image": CATEGORY_IMAGES.get(name),
 		}
 	)
 	doc.insert(ignore_permissions=True)
@@ -449,21 +535,21 @@ def _create_services(company: str):
 		("SRV-EXTENSIONS", "Acrylic Extensions", "تركيب أظافر", "Gel & Extensions", 90, 220, "Full set acrylic extensions shaped to your preference."),
 	]
 	for code, name, name_ar, category, duration, price, description in services:
+		image = SERVICE_IMAGES.get(code) or CATEGORY_IMAGES.get(category)
 		if frappe.db.exists("Beauty Service", code):
-			frappe.db.set_value(
-				"Beauty Service",
-				code,
-				{
-					"service_name": name,
-					"service_name_ar": name_ar,
-					"service_category": category,
-					"description": description,
-					"default_duration": duration,
-					"standard_selling_price": price,
-					"online_booking_enabled": 1,
-					"is_active": 1,
-				},
-			)
+			values = {
+				"service_name": name,
+				"service_name_ar": name_ar,
+				"service_category": category,
+				"description": description,
+				"default_duration": duration,
+				"standard_selling_price": price,
+				"online_booking_enabled": 1,
+				"is_active": 1,
+			}
+			if image and not frappe.db.get_value("Beauty Service", code, "image"):
+				values["image"] = image
+			frappe.db.set_value("Beauty Service", code, values)
 			continue
 		frappe.get_doc(
 			{
@@ -481,6 +567,7 @@ def _create_services(company: str):
 				"kiosk_enabled": 1,
 				"pos_enabled": 1,
 				"allow_salon": 1,
+				"image": image,
 			}
 		).insert(ignore_permissions=True)
 
@@ -579,7 +666,10 @@ BEAUTICIANS = [
 		"last_name": "Al-Ahmad",
 		"gender": "Female",
 		"designation": "Senior Hair Stylist",
-		"image": "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=500&h=650&fit=crop&q=80",
+		"image": "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=500&h=650&fit=crop&q=80",
+		"start_time": "09:00:00",
+		"end_time": "18:00:00",
+		"weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
 		"services": [
 			"SRV-HAIR-CUT", "SRV-BLOW-DRY", "SRV-UPDO", "SRV-ROOT-TOUCH",
 			"SRV-FULL-COLOR", "SRV-HIGHLIGHTS", "SRV-KERATIN", "SRV-HAIR-MASK",
@@ -592,6 +682,9 @@ BEAUTICIANS = [
 		"gender": "Female",
 		"designation": "Nail & Skin Specialist",
 		"image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=650&fit=crop&q=80",
+		"start_time": "10:00:00",
+		"end_time": "20:00:00",
+		"weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
 		"services": [
 			"SRV-MANICURE", "SRV-PEDICURE", "SRV-MANI-PEDI", "SRV-NAIL-ART",
 			"SRV-FRENCH", "SRV-GEL-MANI", "SRV-GEL-PEDI", "SRV-EXTENSIONS",
@@ -605,6 +698,9 @@ BEAUTICIANS = [
 		"gender": "Female",
 		"designation": "Facial & Skin Therapist",
 		"image": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&h=650&fit=crop&q=80",
+		"start_time": "09:00:00",
+		"end_time": "17:00:00",
+		"weekdays": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
 		"services": [
 			"SRV-FACIAL", "SRV-ANTI-AGE", "SRV-HYDRA", "SRV-CHEM-PEEL",
 			"SRV-MICRO", "SRV-THREAD", "SRV-WAX-FULL", "SRV-WAX-BODY",
@@ -616,7 +712,10 @@ BEAUTICIANS = [
 		"last_name": "Al-Qahtani",
 		"gender": "Female",
 		"designation": "Color & Treatment Expert",
-		"image": "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&h=650&fit=crop&q=80",
+		"image": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=650&fit=crop&q=80",
+		"start_time": "11:00:00",
+		"end_time": "21:00:00",
+		"weekdays": ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
 		"services": [
 			"SRV-HAIR-CUT", "SRV-BLOW-DRY", "SRV-ROOT-TOUCH", "SRV-FULL-COLOR",
 			"SRV-HIGHLIGHTS", "SRV-KERATIN", "SRV-HAIR-MASK", "SRV-UPDO",
@@ -629,6 +728,9 @@ BEAUTICIANS = [
 		"gender": "Female",
 		"designation": "Bridal & Occasion Stylist",
 		"image": "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=500&h=650&fit=crop&q=80",
+		"start_time": "12:00:00",
+		"end_time": "21:00:00",
+		"weekdays": ["Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
 		"services": ["SRV-UPDO", "SRV-BLOW-DRY", "SRV-HAIR-CUT", "SRV-HIGHLIGHTS"],
 	},
 	{
@@ -637,7 +739,10 @@ BEAUTICIANS = [
 		"last_name": "Al-Shehri",
 		"gender": "Female",
 		"designation": "Senior Nail Artist",
-		"image": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&h=650&fit=crop&q=80",
+		"image": "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=650&fit=crop&q=80",
+		"start_time": "10:00:00",
+		"end_time": "19:00:00",
+		"weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
 		"services": ["SRV-MANICURE", "SRV-PEDICURE", "SRV-NAIL-ART", "SRV-GEL-MANI", "SRV-GEL-PEDI", "SRV-FRENCH"],
 	},
 	{
@@ -647,6 +752,9 @@ BEAUTICIANS = [
 		"gender": "Female",
 		"designation": "Makeup & Brow Artist",
 		"image": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&h=650&fit=crop&q=80",
+		"start_time": "13:00:00",
+		"end_time": "21:00:00",
+		"weekdays": ["Thursday", "Friday", "Saturday", "Sunday"],
 		"services": ["SRV-THREAD", "SRV-FACIAL", "SRV-UPDO", "SRV-BLOW-DRY"],
 	},
 	{
@@ -655,8 +763,92 @@ BEAUTICIANS = [
 		"last_name": "Al-Dosari",
 		"gender": "Female",
 		"designation": "Spa & Wellness Therapist",
-		"image": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&h=650&fit=crop&q=80",
+		"image": "https://images.unsplash.com/photo-1548142813-c348350df52b?w=500&h=650&fit=crop&q=80",
+		"start_time": "09:00:00",
+		"end_time": "16:00:00",
+		"weekdays": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
 		"services": ["SRV-FACIAL", "SRV-HYDRA", "SRV-ANTI-AGE", "SRV-WAX-BODY", "SRV-PEDICURE"],
+	},
+	{
+		"employee_name": "Yasmin Al-Faisal",
+		"first_name": "Yasmin",
+		"last_name": "Al-Faisal",
+		"gender": "Female",
+		"designation": "Master Colorist",
+		"image": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&h=650&fit=crop&q=80",
+		"start_time": "10:00:00",
+		"end_time": "20:00:00",
+		"weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+		"services": [
+			"SRV-ROOT-TOUCH", "SRV-FULL-COLOR", "SRV-HIGHLIGHTS", "SRV-HAIR-CUT",
+			"SRV-BLOW-DRY", "SRV-KERATIN",
+		],
+	},
+	{
+		"employee_name": "Dana Al-Rashid",
+		"first_name": "Dana",
+		"last_name": "Al-Rashid",
+		"gender": "Female",
+		"designation": "Lash & Brow Artist",
+		"image": "https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=500&h=650&fit=crop&q=80",
+		"start_time": "11:00:00",
+		"end_time": "20:00:00",
+		"weekdays": ["Sunday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+		"services": ["SRV-THREAD", "SRV-WAX-FULL", "SRV-FACIAL", "SRV-ANTI-AGE"],
+	},
+	{
+		"employee_name": "Lina Al-Ghamdi",
+		"first_name": "Lina",
+		"last_name": "Al-Ghamdi",
+		"gender": "Female",
+		"designation": "Family Hair Stylist",
+		"image": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=650&fit=crop&q=80",
+		"start_time": "09:00:00",
+		"end_time": "17:00:00",
+		"weekdays": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Saturday"],
+		"services": ["SRV-HAIR-CUT", "SRV-BLOW-DRY", "SRV-HAIR-MASK", "SRV-UPDO"],
+	},
+	{
+		"employee_name": "Joud Al-Nasser",
+		"first_name": "Joud",
+		"last_name": "Al-Nasser",
+		"gender": "Female",
+		"designation": "Keratin Specialist",
+		"image": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=500&h=650&fit=crop&q=80",
+		"start_time": "12:00:00",
+		"end_time": "21:00:00",
+		"weekdays": ["Monday", "Wednesday", "Thursday", "Friday", "Saturday"],
+		"services": ["SRV-KERATIN", "SRV-HAIR-MASK", "SRV-BLOW-DRY", "SRV-HAIR-CUT", "SRV-FULL-COLOR"],
+	},
+	{
+		"employee_name": "Rania Al-Zahrani",
+		"first_name": "Rania",
+		"last_name": "Al-Zahrani",
+		"gender": "Female",
+		"designation": "Senior All-Round Stylist",
+		"image": "https://images.unsplash.com/photo-1541823709867-1b206113eafd?w=500&h=650&fit=crop&q=80",
+		"start_time": "09:00:00",
+		"end_time": "21:00:00",
+		"weekdays": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+		"services": [
+			"SRV-HAIR-CUT", "SRV-BLOW-DRY", "SRV-UPDO", "SRV-FACIAL",
+			"SRV-MANICURE", "SRV-PEDICURE", "SRV-THREAD", "SRV-HYDRA",
+		],
+	},
+	{
+		"employee_name": "Tala Al-Malki",
+		"first_name": "Tala",
+		"last_name": "Al-Malki",
+		"gender": "Female",
+		"designation": "Gel & Extensions Artist",
+		"image": "https://images.unsplash.com/photo-1554151228-14d9def656e4?w=500&h=650&fit=crop&q=80",
+		"start_time": "10:00:00",
+		"end_time": "19:00:00",
+		"weekdays": ["Sunday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+		"services": [
+			"SRV-GEL-MANI", "SRV-GEL-PEDI", "SRV-EXTENSIONS", "SRV-NAIL-ART",
+			"SRV-FRENCH", "SRV-MANICURE", "SRV-PEDICURE",
+		],
 	},
 ]
 
@@ -764,8 +956,6 @@ def _sync_hr_shifts(company: str):
 
 def _ensure_employee_schedules(company: str):
 	branch = "BBY-MAIN"
-	weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-	# Sunday off for demo variety — branch still open
 
 	for row in BEAUTICIANS:
 		employee = frappe.db.get_value(
@@ -776,11 +966,33 @@ def _ensure_employee_schedules(company: str):
 		if not employee:
 			continue
 
+		weekdays = row.get("weekdays") or [
+			"Monday",
+			"Tuesday",
+			"Wednesday",
+			"Thursday",
+			"Friday",
+			"Saturday",
+		]
+		start_time = row.get("start_time") or "09:00:00"
+		end_time = row.get("end_time") or "21:00:00"
+
 		for weekday in weekdays:
-			if frappe.db.exists(
+			existing = frappe.db.get_value(
 				"Beauty Employee Schedule",
 				{"employee": employee, "beauty_branch": branch, "weekday": weekday},
-			):
+				"name",
+			)
+			if existing:
+				frappe.db.set_value(
+					"Beauty Employee Schedule",
+					existing,
+					{
+						"start_time": start_time,
+						"end_time": end_time,
+						"is_active": 1,
+					},
+				)
 				continue
 			frappe.get_doc(
 				{
@@ -789,8 +1001,8 @@ def _ensure_employee_schedules(company: str):
 					"company": company,
 					"beauty_branch": branch,
 					"weekday": weekday,
-					"start_time": "09:00:00",
-					"end_time": "21:00:00",
+					"start_time": start_time,
+					"end_time": end_time,
 					"is_active": 1,
 				}
 			).insert(ignore_permissions=True)

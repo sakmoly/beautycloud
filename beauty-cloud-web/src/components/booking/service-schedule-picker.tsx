@@ -122,6 +122,24 @@ function formatDateLabel(iso: string) {
   });
 }
 
+type DayPeriod = "morning" | "afternoon" | "evening";
+
+const PERIOD_META: Record<DayPeriod, { label: string; icon: string }> = {
+  morning: { label: "Morning", icon: "🌅" },
+  afternoon: { label: "Afternoon", icon: "☀️" },
+  evening: { label: "Evening", icon: "🌙" },
+};
+
+function periodForHour(hour: number): DayPeriod {
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+function periodForSlotStart(startTime: string): DayPeriod {
+  return periodForHour(Number(formatTime(startTime).slice(0, 2)));
+}
+
 function groupSlotsByPeriod(slots: AvailabilitySlot[]) {
   const groups = {
     morning: [] as AvailabilitySlot[],
@@ -129,12 +147,18 @@ function groupSlotsByPeriod(slots: AvailabilitySlot[]) {
     evening: [] as AvailabilitySlot[],
   };
   for (const slot of slots) {
-    const hour = Number(formatTime(slot.start_time).slice(0, 2));
-    if (hour < 12) groups.morning.push(slot);
-    else if (hour < 17) groups.afternoon.push(slot);
-    else groups.evening.push(slot);
+    groups[periodForSlotStart(slot.start_time)].push(slot);
   }
   return groups;
+}
+
+function firstAvailablePeriod(
+  groups: ReturnType<typeof groupSlotsByPeriod>,
+  preferred?: DayPeriod | null,
+): DayPeriod | null {
+  const order: DayPeriod[] = ["morning", "afternoon", "evening"];
+  if (preferred && groups[preferred].length) return preferred;
+  return order.find((key) => groups[key].length > 0) ?? null;
 }
 
 function BeauticianAvatar({
@@ -227,6 +251,7 @@ export function ServiceSchedulePicker({
   const [splitSlotsByService, setSplitSlotsByService] = useState<Record<string, AvailabilitySlot[]>>({});
   const [splitLoadingService, setSplitLoadingService] = useState<string | null>(null);
   const [activeSplitService, setActiveSplitService] = useState("");
+  const [openPeriod, setOpenPeriod] = useState<DayPeriod | "none" | null>(null);
 
   const splitAssignments =
     value?.mode === "split" ? value.assignments : ([] as ServiceAssignment[]);
@@ -467,12 +492,10 @@ export function ServiceSchedulePicker({
     () => filterPastSlots(unifiedSlots, appointmentDate),
     [unifiedSlots, appointmentDate],
   );
-  const groupedSlots = useMemo(() => groupSlotsByPeriod(visibleUnifiedSlots), [visibleUnifiedSlots]);
-  const periodSections = [
-    { key: "morning", label: "Morning", icon: "🌅", items: groupedSlots.morning },
-    { key: "afternoon", label: "Afternoon", icon: "☀️", items: groupedSlots.afternoon },
-    { key: "evening", label: "Evening", icon: "🌙", items: groupedSlots.evening },
-  ].filter((section) => section.items.length > 0);
+  const periodContextKey = `${appointmentDate}|${mode}|${employeeFilter}|${activeSplitService}`;
+  useEffect(() => {
+    setOpenPeriod(null);
+  }, [periodContextKey]);
 
   const dayBtnClass = (active: boolean) =>
     isKiosk ? `bc-kiosk-day-card ${active ? "active" : ""}` : `bc-day-btn ${active ? "active" : ""}`;
@@ -623,54 +646,81 @@ export function ServiceSchedulePicker({
       );
     }
     const sections = groupSlotsByPeriod(slots);
-    const blocks = [
-      { key: "morning", label: "Morning", items: sections.morning },
-      { key: "afternoon", label: "Afternoon", items: sections.afternoon },
-      { key: "evening", label: "Evening", items: sections.evening },
-    ].filter((section) => section.items.length > 0);
+    const blocks = (["morning", "afternoon", "evening"] as DayPeriod[])
+      .map((key) => ({ key, ...PERIOD_META[key], items: sections[key] }))
+      .filter((section) => section.items.length > 0);
+    const selectedPeriod = selected ? periodForSlotStart(selected.start_time) : null;
+    const preferred =
+      selectedPeriod ??
+      (isTodayIso(appointmentDate) ? periodForHour(new Date().getHours()) : "morning");
+    const autoOpen = firstAvailablePeriod(sections, preferred);
+    const expanded =
+      openPeriod === "none" ? null : openPeriod && sections[openPeriod].length ? openPeriod : autoOpen;
 
     return (
       <div className={isKiosk ? "bc-kiosk-time-sections" : "bc-time-sections"}>
-        {blocks.map((section) => (
-          <div key={section.key} className={isKiosk ? "bc-kiosk-time-section" : undefined}>
-            <p className={isKiosk ? "bc-kiosk-time-section-label" : "bc-time-section-label"}>
-              {section.label}
-            </p>
-            <div className={isKiosk ? "bc-kiosk-time-grid" : "bc-time-grid"}>
-              {section.items.map((slot) => {
-                const active =
-                  selected?.employee === slot.employee &&
-                  selected.start_time === slot.start_time;
-                return (
-                  <button
-                    key={`${slot.employee}-${slot.start_time}`}
-                    type="button"
-                    className={timeBtnClass(active)}
-                    onClick={() => onSelect(slot)}
-                    aria-pressed={active}
-                  >
-                    {active ? (
-                      <span
-                        className={isKiosk ? "bc-kiosk-time-card-check" : "bc-time-slot-check"}
-                        aria-hidden
+        {blocks.map((section) => {
+          const isOpen = expanded === section.key;
+          return (
+            <div
+              key={section.key}
+              className={isKiosk ? "bc-kiosk-time-section bc-time-period" : "bc-time-period"}
+            >
+              <button
+                type="button"
+                className={isKiosk ? "bc-kiosk-time-period-toggle" : "bc-time-period-toggle"}
+                aria-expanded={isOpen}
+                onClick={() => setOpenPeriod(isOpen ? "none" : section.key)}
+              >
+                <span className={isKiosk ? "bc-kiosk-time-section-label" : "bc-time-section-label"}>
+                  <span aria-hidden>{section.icon}</span>
+                  {section.label}
+                </span>
+                <span className={isKiosk ? "bc-kiosk-time-section-count" : "bc-time-period-meta"}>
+                  {section.items.length} {section.items.length === 1 ? "slot" : "slots"}
+                  <span className="bc-time-period-chevron" aria-hidden>
+                    {isOpen ? "▴" : "▾"}
+                  </span>
+                </span>
+              </button>
+              {isOpen ? (
+                <div className={isKiosk ? "bc-kiosk-time-grid" : "bc-time-grid"}>
+                  {section.items.map((slot) => {
+                    const active =
+                      selected?.employee === slot.employee &&
+                      selected.start_time === slot.start_time;
+                    return (
+                      <button
+                        key={`${slot.employee}-${slot.start_time}`}
+                        type="button"
+                        className={timeBtnClass(active)}
+                        onClick={() => onSelect(slot)}
+                        aria-pressed={active}
                       >
-                        ✓
-                      </span>
-                    ) : null}
-                    <span className={isKiosk ? "bc-kiosk-time-card-time" : "bc-time-slot-time"}>
-                      {formatTime(slot.start_time)}
-                    </span>
-                    {!employeeLocked ? (
-                      <span className={isKiosk ? "bc-kiosk-time-card-stylist" : "bc-time-slot-stylist"}>
-                        {slot.employee_name}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
+                        {active ? (
+                          <span
+                            className={isKiosk ? "bc-kiosk-time-card-check" : "bc-time-slot-check"}
+                            aria-hidden
+                          >
+                            ✓
+                          </span>
+                        ) : null}
+                        <span className={isKiosk ? "bc-kiosk-time-card-time" : "bc-time-slot-time"}>
+                          {formatTime(slot.start_time)}
+                        </span>
+                        {!employeeLocked ? (
+                          <span className={isKiosk ? "bc-kiosk-time-card-stylist" : "bc-time-slot-stylist"}>
+                            {slot.employee_name}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -901,7 +951,6 @@ export function ServiceSchedulePicker({
         </p>
       ) : null}
 
-      {periodSections.length === 0 && mode === "unified" ? null : null}
     </div>
   );
 }

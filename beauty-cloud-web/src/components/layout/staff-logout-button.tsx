@@ -25,7 +25,7 @@ export function StaffLogoutButton() {
       type="button"
       onClick={() => void logout()}
       disabled={busy}
-      className="rounded-full border border-[color:var(--bc-border)] bg-white/90 px-4 py-2 text-sm font-medium text-[color:var(--bc-muted)] shadow-sm transition hover:border-[color:var(--bc-danger)]/30 hover:text-[color:var(--bc-danger)] disabled:opacity-60"
+      className="flex shrink-0 items-center whitespace-nowrap rounded-full bg-white/80 px-3.5 py-2 text-sm font-medium text-[color:var(--bc-muted)] transition hover:bg-[color:var(--bc-accent-light)] hover:text-[color:var(--bc-danger)] disabled:opacity-60"
     >
       {busy ? "Signing out…" : "Log out"}
     </button>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CmsImage } from "@/components/marketing/cms-image";
 import { StylistCarousel } from "@/components/marketing/stylist-carousel";
 import type { WebPageContent, WebPageSection, WebPageWhyUsItem } from "@/lib/frappe/types";
+import { CatalogPhoto } from "@/components/ui/catalog-photo";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { withBasePath } from "@/lib/base-path";
 
@@ -172,12 +173,12 @@ function SectionServicesGrid({ section }: { section: WebPageSection }) {
               className="bc-cms-service-card group"
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-[color:var(--bc-accent-muted)]">
-                {category.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={category.image} alt={category.label} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-5xl opacity-60">{categoryEmoji(category.label)}</div>
-                )}
+                <CatalogPhoto
+                  src={category.image}
+                  alt={category.label}
+                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  fallback={<div className="flex h-full items-center justify-center text-5xl opacity-60">{categoryEmoji(category.label)}</div>}
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-80" />
                 <p className="absolute bottom-4 left-4 font-display text-2xl text-white">{category.label}</p>
               </div>

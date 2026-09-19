@@ -86,7 +86,9 @@ def get_services(company: str | None = None, branch: str | None = None, online_o
 	if online_only:
 		filters["online_booking_enabled"] = 1
 
-	return frappe.get_all(
+	from beauty_cloud.utils.files import public_file_url
+
+	rows = frappe.get_all(
 		"Beauty Service",
 		filters=filters,
 		fields=[
@@ -101,6 +103,10 @@ def get_services(company: str | None = None, branch: str | None = None, online_o
 			"allow_home",
 			"allow_hotel",
 			"description",
+			"image",
 		],
 		order_by="service_name asc",
 	)
+	for row in rows:
+		row["image"] = public_file_url(row.get("image"))
+	return rows

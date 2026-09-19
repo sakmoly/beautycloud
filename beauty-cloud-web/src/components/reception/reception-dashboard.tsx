@@ -13,7 +13,7 @@ import type { BeautyAppointment, ReceptionDashboard } from "@/lib/api/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { LoadingState } from "@/components/ui/states";
+import { ErrorState, LoadingState } from "@/components/ui/states";
 
 function formatDisplayDate(isoDate: string): string {
   try {
@@ -59,10 +59,17 @@ export function ReceptionDashboardView() {
   const [dashboard, setDashboard] = useState<ReceptionDashboard | null>(null);
   const [queue, setQueue] = useState<BeautyAppointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
 
   async function refresh() {
+    if (!branch) {
+      setLoading(false);
+      setError("No salon branch is assigned to this login yet.");
+      return;
+    }
     setLoading(true);
+    setError(null);
     try {
       const [dash, q] = await Promise.all([
         getReceptionDashboard(branch, date),
@@ -73,18 +80,34 @@ export function ReceptionDashboardView() {
       setSelectedQueueId((current) =>
         current && q.some((row) => row.name === current) ? current : null,
       );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load reception dashboard");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (!ready || !branch) return;
+    if (!ready) return;
     refresh();
   }, [branch, date, ready]);
 
-  if (loading && !dashboard) {
+  if (!ready || (loading && !dashboard && !error)) {
     return <LoadingState title="Loading reception dashboard" />;
+  }
+
+  if (error && !dashboard) {
+    return (
+      <ErrorState
+        title="Reception dashboard"
+        description={error}
+        action={
+          <Button variant="secondary" onClick={() => void refresh()}>
+            Try again
+          </Button>
+        }
+      />
+    );
   }
 
   const summary = dashboardSummary(dashboard);

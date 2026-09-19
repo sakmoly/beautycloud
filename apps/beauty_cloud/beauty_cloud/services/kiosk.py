@@ -8,6 +8,7 @@ from frappe.utils import now_datetime
 
 from beauty_cloud.services.booking import create_booking
 from beauty_cloud.services.branding import get_resolved_branding
+from beauty_cloud.utils.files import public_file_url
 from beauty_cloud.beauty_cloud.doctype.beauty_cloud_settings.beauty_cloud_settings import (
 	get_allowed_payment_modes,
 )
@@ -69,9 +70,12 @@ def get_kiosk_bootstrap(device_id: str, api_key: str) -> dict:
 			"default_duration",
 			"standard_selling_price",
 			"allow_salon",
+			"image",
 		],
 		order_by="service_name asc",
 	)
+	for row in services:
+		row["image"] = public_file_url(row.get("image"))
 
 	branch_name = None
 	if device.get("beauty_branch"):
@@ -274,6 +278,14 @@ def kiosk_create_booking(device_id: str, api_key: str, data: dict) -> dict:
 	return create_booking(payload)
 
 
+def kiosk_get_check_in_qr(device_id: str, api_key: str, appointment: str) -> dict:
+	from beauty_cloud.services.check_in_qr import get_check_in_qr_payload
+
+	device = authenticate_kiosk(device_id, api_key)
+	_assert_kiosk_can_show_appointment(appointment, device)
+	return get_check_in_qr_payload(appointment)
+
+
 def kiosk_collect_payment(
 	device_id: str,
 	api_key: str,
@@ -300,6 +312,20 @@ def kiosk_collect_payment(
 		)
 	finally:
 		frappe.set_user(prev_user)
+
+
+def _assert_kiosk_can_show_appointment(appointment_name: str, device: dict) -> None:
+	if not frappe.db.exists("Beauty Appointment", appointment_name):
+		frappe.throw(_("Appointment not found"))
+	appt = frappe.db.get_value(
+		"Beauty Appointment",
+		appointment_name,
+		["beauty_branch"],
+		as_dict=True,
+	)
+	appt_company = frappe.db.get_value("Beauty Branch", appt.beauty_branch, "company")
+	if appt_company != device["company"]:
+		frappe.throw(_("Appointment does not belong to this kiosk"))
 
 
 def _validate_kiosk_appointment(appointment_name: str, device: dict) -> None:

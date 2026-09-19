@@ -1,15 +1,13 @@
 import { SetupWizard } from "@/components/setup/setup-wizard";
 import { StaffShell } from "@/components/layout/staff-shell";
-import { requireStaffSession } from "@/lib/auth/staff-guard";
+import { requireManagerSession } from "@/lib/auth/staff-guard";
 import { getFrappeConfig } from "@/lib/config";
-import { getPublicBootstrap } from "@/lib/frappe/bootstrap";
 
 export const metadata = { title: "Salon setup" };
 
 export default async function SetupPage() {
-  const [bootstrap, session, frappe] = await Promise.all([
-    getPublicBootstrap(),
-    requireStaffSession({ allowIncompleteSetup: true }),
+  const [{ bootstrap, session }, frappe] = await Promise.all([
+    requireManagerSession({ allowIncompleteSetup: true }),
     Promise.resolve(getFrappeConfig()),
   ]);
 

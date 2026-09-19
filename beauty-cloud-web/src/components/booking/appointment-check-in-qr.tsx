@@ -10,16 +10,33 @@ export function AppointmentCheckInQr({
   appointment,
   guest = false,
   compact = false,
+  kioskAuth,
 }: {
   appointment: string;
   guest?: boolean;
   compact?: boolean;
+  kioskAuth?: { device_id: string; api_key: string };
 }) {
   const [qrText, setQrText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!appointment) return;
+
+    if (kioskAuth) {
+      callBeautyMethod<{ qr_text: string }>({
+        method: "beauty_cloud.api.kiosk.get_check_in_qr",
+        guest: true,
+        params: {
+          device_id: kioskAuth.device_id,
+          api_key: kioskAuth.api_key,
+          appointment,
+        },
+      })
+        .then((data) => setQrText(data.qr_text))
+        .catch((e) => setError(e instanceof Error ? e.message : "Could not load QR"));
+      return;
+    }
 
     if (guest) {
       fetch(withBasePath(`/api/beauty/customer/check-in-qr?appointment=${encodeURIComponent(appointment)}`), {
@@ -40,7 +57,7 @@ export function AppointmentCheckInQr({
     })
       .then((data) => setQrText(data.qr_text))
       .catch((e) => setError(e instanceof Error ? e.message : "Could not load QR"));
-  }, [appointment, guest]);
+  }, [appointment, guest, kioskAuth?.device_id, kioskAuth?.api_key]);
 
   if (error) {
     return <p className="text-sm text-[color:var(--bc-danger)]">{error}</p>;

@@ -10,3 +10,4 @@ beauty_cloud.patches.v1_0.setup_check_in_id_validation
 beauty_cloud.patches.v1_0.setup_check_in_before_service
 beauty_cloud.patches.v1_0.setup_invoice_before_service
 beauty_cloud.patches.v1_0.ensure_staff_users
+beauty_cloud.patches.v1_0.seed_catalog_images

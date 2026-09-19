@@ -16,6 +16,7 @@ export interface BeautyService {
   service_category?: string;
   default_duration?: number;
   standard_selling_price?: number;
+  image?: string | null;
 }
 
 export interface AvailabilitySlot {
@@ -244,11 +245,13 @@ export interface PosCatalogueItem {
   rate?: number;
   stock_qty?: number;
   item_group?: string;
+  image?: string | null;
 }
 
 export interface PosServiceCategory {
   name: string;
   label: string;
+  image?: string | null;
   services: BeautyService[];
 }
 

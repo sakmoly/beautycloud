@@ -38,7 +38,21 @@ def get_user_beauty_branches(user: str | None = None) -> list[str] | None:
 		filters={"employee": employee, "is_active": 1},
 		pluck="beauty_branch",
 	)
-	return sorted({branch for branch in branches if branch})
+	found = sorted({branch for branch in branches if branch})
+	if found:
+		return found
+
+	roles = set(frappe.get_roles(user))
+	if roles.intersection({"Beauty Cloud Receptionist", "Beauty Cloud Cashier", "Beauty Cloud Beautician"}):
+		company = frappe.db.get_value("Employee", employee, "company")
+		if company:
+			return frappe.get_all(
+				"Beauty Branch",
+				filters={"company": company, "is_active": 1},
+				pluck="name",
+				order_by="branch_name asc",
+			)
+	return []
 
 
 def get_user_default_beauty_branch(user: str | None = None) -> str | None:

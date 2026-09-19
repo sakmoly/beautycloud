@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 
 
@@ -12,8 +13,18 @@ class BeautyCloudSettings(Document):
 		else:
 			self.sms_note = "SMS OTP enabled — configure SMS provider integration before production use."
 
-		if self.require_payment_at_booking and not self.enable_telr:
-			frappe.throw(_("Enable Telr Payment Gateway when payment at booking is required."))
+		if (self.require_payment_at_booking or self.require_payment_at_kiosk) and not self.enable_telr:
+			frappe.throw(_("Enable Telr Payment Gateway when payment at booking or kiosk is required."))
+
+		if self.enable_telr and not self.telr_demo_mode:
+			store_id = (self.telr_store_id or "").strip()
+			if not store_id or store_id in {"1234", "0000"}:
+				frappe.throw(
+					_(
+						"Telr Store ID {0} is a demo placeholder. Enter the real Store ID from "
+						"your Telr merchant dashboard, or enable Telr Demo Mode."
+					).format(store_id or _("(empty)"))
+				)
 
 		if self.enable_telr and self.telr_demo_mode:
 			self.telr_note = (

@@ -62,8 +62,10 @@ def customer_search(query: str, limit: int = 12):
 
 @frappe.whitelist()
 def get_services():
+	from beauty_cloud.utils.files import public_file_url
+
 	settings = frappe.get_single("Beauty Cloud Settings")
-	return frappe.get_all(
+	rows = frappe.get_all(
 		"Beauty Service",
 		filters={"company": settings.company, "is_active": 1, "pos_enabled": 1},
 		fields=[
@@ -73,9 +75,13 @@ def get_services():
 			"service_category",
 			"default_duration",
 			"standard_selling_price",
+			"image",
 		],
 		order_by="service_name asc",
 	)
+	for row in rows:
+		row["image"] = public_file_url(row.get("image"))
+	return rows
 
 
 @frappe.whitelist()

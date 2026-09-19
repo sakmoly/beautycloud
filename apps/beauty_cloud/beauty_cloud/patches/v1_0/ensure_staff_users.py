@@ -7,7 +7,7 @@ from beauty_cloud.setup.staff_users import ensure_staff_users
 
 
 def execute():
-	company = frappe.db.get_value("Company", {"company_name": "Bahyea Bauty"}) or "Bahyea Bauty"
+	company = frappe.db.get_value("Company", {"company_name": "beautcloud"}) or frappe.db.get_value("Company", {"name": "beautcloud"}) or "beautcloud"
 	if not frappe.db.exists("Company", company):
 		return
 

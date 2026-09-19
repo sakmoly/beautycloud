@@ -81,6 +81,27 @@ function formatDateLabel(iso: string) {
   });
 }
 
+function formatCardNumber(value: string) {
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 16)
+    .replace(/(\d{4})(?=\d)/g, "$1 ")
+    .trim();
+}
+
+function formatExpiry(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+function cardFormValid(cardNumber: string, cardExpiry: string, cardCvv: string) {
+  const digits = cardNumber.replace(/\D/g, "");
+  const expiry = cardExpiry.replace(/\D/g, "");
+  const cvv = cardCvv.replace(/\D/g, "");
+  return digits.length >= 15 && expiry.length >= 4 && cvv.length >= 3;
+}
+
 export function BookingWizard({
   bootstrap,
   initialSelectedServices = [],
@@ -111,6 +132,9 @@ export function BookingWizard({
   const [requirePayment, setRequirePayment] = useState(false);
   const [paymentSession, setPaymentSession] = useState<BookingPaymentSession | null>(null);
   const [bookingResult, setBookingResult] = useState<{ name?: string } | null>(null);
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
 
   const branchImage = bootstrap?.branding?.booking_header_image;
   const activeBranch = branches.find((b) => b.name === branch);
@@ -269,6 +293,10 @@ export function BookingWizard({
 
   async function payWithDemo() {
     if (!paymentSession?.payment_name || !paymentSession.demo_token) return;
+    if (!cardFormValid(cardNumber, cardExpiry, cardCvv)) {
+      setError("Enter the card number, expiry (MM/YY), and CVV to confirm payment.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -277,7 +305,7 @@ export function BookingWizard({
         demo_token: paymentSession.demo_token,
       })) as BookingPaymentSession;
       if (!result.confirmed) {
-        setError("Demo payment could not be completed.");
+        setError("Payment could not be completed.");
         return;
       }
       setBookingResult({ name: result.appointment });
@@ -303,6 +331,7 @@ export function BookingWizard({
         show: true,
         label: "Continue",
         disabled: selectedServices.length === 0,
+        hint: selectedServices.length === 0 ? "Add a service to continue" : "Ready to continue",
         onContinue: goToVisit,
       };
     }
@@ -311,16 +340,23 @@ export function BookingWizard({
         show: true,
         label: "Continue",
         disabled: !branch,
+        hint: branch ? "Ready to continue" : "Choose a salon to continue",
         onContinue: goToSlots,
       };
     }
     if (step === "slots") {
+      const ready = Boolean(
+        branch && scheduleSelectionReady(scheduleSelection, selectedServices.length),
+      );
       return {
         show: true,
         label: "Continue",
-        disabled:
-          !branch ||
-          !scheduleSelectionReady(scheduleSelection, selectedServices.length),
+        disabled: !ready,
+        hint: ready
+          ? totalDuration > 0
+            ? `Ready · ${totalDuration} min`
+            : "Ready to continue"
+          : "Choose a time to continue",
         onContinue: () => setStep("otp"),
       };
     }
@@ -351,7 +387,7 @@ export function BookingWizard({
     <div className="bc-wizard-shell">
       <BookingWizardHeader step={step} onClose={<WizardCloseButton />} />
 
-      <div className="bc-wizard-body">
+      <div className={`bc-wizard-body${sidebarContinue.show ? " has-sticky-continue" : ""}`}>
         <div className="bc-wizard-main">
           {error ? (
             <div
@@ -575,13 +611,72 @@ export function BookingWizard({
                   <p className="text-3xl font-bold">
                     {paymentSession.currency ?? "SAR"} {paymentSession.amount ?? totalPrice}
                   </p>
+                  <p className="mt-1 text-sm text-[color:var(--bc-muted)]">
+                    {selectedServiceDetails.map((service) => service.service_name).join(", ") || "Selected services"}
+                    {paymentSession.appointment ? ` · ${paymentSession.appointment}` : ""}
+                  </p>
                 </div>
                 {paymentSession.demo_mode ? (
-                  <Button onClick={payWithDemo} disabled={busy}>
-                    {busy ? "Processing…" : "Simulate successful payment"}
-                  </Button>
+                  <div className="space-y-4">
+                    <p className="text-sm font-semibold text-[color:var(--bc-text)]">Card details</p>
+                    {paymentSession.demo_card ? (
+                      <p className="text-sm text-[color:var(--bc-muted)]">
+                        Test card {paymentSession.demo_card.number}, expiry 12/28, CVV{" "}
+                        {paymentSession.demo_card.cvv}.
+                      </p>
+                    ) : null}
+                    <div>
+                      <Label htmlFor="book-card-number">Card number</Label>
+                      <Input
+                        id="book-card-number"
+                        value={cardNumber}
+                        onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
+                        placeholder="4111 1111 1111 1111"
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                        className="mt-1.5 font-mono tracking-wider"
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="book-card-expiry">Expiry (MM/YY)</Label>
+                        <Input
+                          id="book-card-expiry"
+                          value={cardExpiry}
+                          onChange={(event) => setCardExpiry(formatExpiry(event.target.value))}
+                          placeholder="12/28"
+                          inputMode="numeric"
+                          autoComplete="cc-exp"
+                          className="mt-1.5 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="book-card-cvv">CVV</Label>
+                        <Input
+                          id="book-card-cvv"
+                          value={cardCvv}
+                          onChange={(event) =>
+                            setCardCvv(event.target.value.replace(/\D/g, "").slice(0, 4))
+                          }
+                          placeholder="123"
+                          inputMode="numeric"
+                          autoComplete="cc-csc"
+                          className="mt-1.5 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => void payWithDemo()}
+                      disabled={busy || !cardFormValid(cardNumber, cardExpiry, cardCvv)}
+                      className="w-full"
+                    >
+                      {busy
+                        ? "Confirming payment…"
+                        : `Confirm payment · ${paymentSession.currency ?? "SAR"} ${paymentSession.amount ?? totalPrice}`}
+                    </Button>
+                  </div>
                 ) : (
-                  <Button onClick={payWithTelr} disabled={busy}>
+                  <Button onClick={payWithTelr} disabled={busy} className="w-full">
                     Pay with Telr
                   </Button>
                 )}
@@ -630,6 +725,7 @@ export function BookingWizard({
           showContinue={sidebarContinue.show}
           continueLabel={sidebarContinue.label}
           continueDisabled={sidebarContinue.disabled}
+          continueHint={sidebarContinue.hint}
           onContinue={sidebarContinue.onContinue}
           vat={bootstrap?.vat}
         />

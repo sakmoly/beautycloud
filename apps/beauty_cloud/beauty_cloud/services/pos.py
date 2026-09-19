@@ -615,10 +615,12 @@ def get_today_orders(beauty_branch: str, appointment_date: str | None = None) ->
 def get_service_catalog() -> dict:
 	"""Service categories with POS-enabled services (Fresha-style drill-down)."""
 	settings = frappe.get_single("Beauty Cloud Settings")
+	from beauty_cloud.utils.files import public_file_url
+
 	categories = frappe.get_all(
 		"Beauty Service Category",
 		filters={"company": settings.company, "is_active": 1, "is_group": 0},
-		fields=["name", "category_name", "sort_order"],
+		fields=["name", "category_name", "sort_order", "image"],
 		order_by="sort_order asc, category_name asc",
 	)
 	services = frappe.get_all(
@@ -631,9 +633,12 @@ def get_service_catalog() -> dict:
 			"service_category",
 			"default_duration",
 			"standard_selling_price",
+			"image",
 		],
 		order_by="service_name asc",
 	)
+	for svc in services:
+		svc["image"] = public_file_url(svc.get("image"))
 
 	by_category: dict[str, list] = {}
 	for svc in services:
@@ -648,6 +653,7 @@ def get_service_catalog() -> dict:
 				{
 					"name": cat.name,
 					"label": cat.category_name,
+					"image": public_file_url(cat.get("image")),
 					"services": by_category[cat.name],
 				}
 			)
@@ -661,6 +667,7 @@ def get_service_catalog() -> dict:
 			{
 				"name": key,
 				"label": label or ("Other" if key == "_other" else key),
+				"image": public_file_url(next((c.get("image") for c in categories if c.name == key), None)),
 				"services": svc_list,
 			}
 		)

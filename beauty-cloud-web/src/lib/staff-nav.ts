@@ -44,7 +44,7 @@ function hasRole(workflow: StaffWorkflowCapabilities | undefined, role: string):
   return Boolean(workflow?.roles?.includes(role));
 }
 
-function isManager(workflow: StaffWorkflowCapabilities | undefined): boolean {
+export function isStaffManager(workflow: StaffWorkflowCapabilities | undefined): boolean {
   return (
     hasRole(workflow, "Administrator") ||
     hasRole(workflow, "System Manager") ||
@@ -52,11 +52,19 @@ function isManager(workflow: StaffWorkflowCapabilities | undefined): boolean {
   );
 }
 
+export function staffHomeHref(workflow: StaffWorkflowCapabilities | undefined): string {
+  if (isStaffManager(workflow)) return "/staff/reception";
+  if (hasRole(workflow, "Beauty Cloud Receptionist")) return "/staff/reception";
+  if (hasRole(workflow, "Beauty Cloud Cashier")) return "/staff/pos";
+  if (hasRole(workflow, "Beauty Cloud Beautician")) return "/staff/beautician";
+  return "/staff/reception";
+}
+
 export function staffNavItems(
   workflow: StaffWorkflowCapabilities | undefined,
   compact = false,
 ): StaffNavItem[] {
-  if (isManager(workflow)) {
+  if (isStaffManager(workflow)) {
     return compact ? STAFF_COMPACT_NAV : STAFF_NAV;
   }
 
@@ -74,5 +82,5 @@ export function staffNavItems(
     return RECEPTION_NAV;
   }
 
-  return compact ? STAFF_COMPACT_NAV : STAFF_NAV;
+  return compact ? CASHIER_NAV : RECEPTION_NAV;
 }

@@ -25,9 +25,15 @@ def get_resolved_branding(company: str, branch: str | None = None) -> dict:
 		if docname:
 			doc = frappe.get_doc("Beauty Cloud Branding Settings", docname)
 
+	default_logo = "/assets/beauty_cloud/images/beauty-cloud-wordmark.png"
+	default_favicon = "/assets/beauty_cloud/images/beauty-cloud-favicon.png"
+
 	defaults = {
 		"application_title": "Beau-T-Cloud",
 		"company_display_name": frappe.db.get_value("Company", company, "company_name"),
+		"logo_light": default_logo,
+		"logo_dark": default_logo,
+		"favicon": default_favicon,
 		"theme_mode": "Light",
 		"primary_color": "#FF1B9A",
 		"secondary_color": "#2E1A2F",
@@ -56,9 +62,9 @@ def get_resolved_branding(company: str, branch: str | None = None) -> dict:
 	return {
 		"application_title": data.get("application_title"),
 		"company_display_name": data.get("company_display_name"),
-		"logo_light": public_file_url(data.get("logo_light")),
-		"logo_dark": public_file_url(data.get("logo_dark")),
-		"favicon": public_file_url(data.get("favicon")),
+		"logo_light": public_file_url(data.get("logo_light")) or default_logo,
+		"logo_dark": public_file_url(data.get("logo_dark")) or default_logo,
+		"favicon": public_file_url(data.get("favicon")) or default_favicon,
 		"booking_header_image": public_file_url(data.get("booking_header_image")),
 		"promo_bar_enabled": bool(data.get("promo_bar_enabled")),
 		"promo_bar_text": data.get("promo_bar_text"),
